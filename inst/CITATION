@@ -1,0 +1,13 @@
+citHeader("To cite textir in publications use:")
+
+citEntry(entry = "Unpublished",
+  title        = "Inverse Regression for Analysis of Sentiment in Text",
+  author       = personList(as.person("M. A. Taddy")),
+  year         = "2011",
+  note          = "http://arxiv.org/abs/1012.2098",
+
+  textVersion  =
+  paste("M. A. Taddy","(2011)",
+        "Inverse Regression for Analysis of Sentiment in Text",
+        "URL http://arxiv.org/abs/1012.2098")
+)

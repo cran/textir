@@ -1,0 +1,10 @@
+1.1 (21 January 2011)
+---
+
+Minor changes: commented out we8there mnlm for faster vignette, and
+	cleaned up the plot.pls function.
+
+1.0 (20 January 2011)
+---
+
+Initial version: mnlm and pls for sentiment analysis
