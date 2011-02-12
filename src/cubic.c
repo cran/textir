@@ -1,6 +1,6 @@
 #include "latools.h"
 #include <assert.h>
-#include <math.h>
+#include <Rmath.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>

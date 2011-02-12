@@ -5,14 +5,12 @@ pls plot
 }
 \description{ Plot function for Partial Least Squares }
 \usage{
-\method{plot}{pls}(x, K=NULL, y=NULL, ...)
+\method{plot}{pls}(x, K=NULL, ...)
 }
 \arguments{
   \item{x}{An output object from the \code{pls} function.}
 \item{K}{The number of pls directions to be used. Can be a vector.
  If \code{K}, plot fitted values for \code{1:fit$K} directions.}
-\item{y}{Optional argument for the response to be plotted against (if, e.g., you 
-wish to plot against unnormalized response).}
  \item{...}{Additional \code{plot} arguments}
 }
 

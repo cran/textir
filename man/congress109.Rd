@@ -46,5 +46,5 @@ fit <- mnlm(congress109Counts, repshare)
 
 par(mfrow=c(1,2))
 plot(fit, pch=21, bg=c(4,3,2)[congress109Ideology$party])
-plot(fit, cat=915, delta=0.05)
+plot(fit, cat=915)
 }

@@ -19,10 +19,11 @@ normalize(x, m=NULL, s=NULL)
  Under default, a matrix with mean-zero and variance-one columns.  
  If shift and scale are specified, a matrix with columns shifted by \code{-m}  and divided by \code{s}. 
 }
+\note{ Not designed for huge sparse matrices. }
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}
 }
 \examples{
 normalize( matrix(1:9, ncol=3) )
  }
-\seealso{ freq, pls }
+\seealso{ freq, corr, sdev, pls  }

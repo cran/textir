@@ -1,5 +1,6 @@
 \name{mnlm}
 \alias{mnlm}
+\alias{txtbin}
 \title{
 Estimation for high-dimensional Multinomial Logistic Regression
 }
@@ -8,7 +9,7 @@ MAP estimation of Multinomial logistic regression models.
   }
 \usage{
 mnlm(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
-                  tol=0.1, tmax=1000, delta=1, dmin=0, verb=TRUE)
+                  tol=0.1, tmax=1000, delta=1, dmin=0, bins=0, verb=TRUE)
 }
 \arguments{
   \item{counts}{
@@ -54,6 +55,11 @@ mnlm(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
    implies a starting trust region of \code{2*delta}.  
 }
 \item{dmin}{ Minimum trust region delta.}
+\item{bins}{ For faster inference on large data sets (or just to collapse observations across levels for factor covariates), 
+	     you can specify the number of \code{bins} for step-function 
+	     approximations to the columns of \code{covars}.  Counts are then collapsed 
+	     across levels of the interaction between columns of the resulting 
+	     discrete covariate matrix, typically resulting in a smaller number of observations for estimation.}
 \item{verb}{
    Level of print-statement output.  \code{TRUE} prints some initial info 
    and updates every iteration.
@@ -72,7 +78,7 @@ Full details are available in Taddy (2011). }
 \item{L}{The unnormalized negative log posterior at each iteration.}
 \item{niter}{The number of iterations}
 \item{X}{\code{simple_triplet_matrix} form of the \code{counts} input matrix}
-\item{V}{Covariate matrix (including the intercept)}
+\item{V}{Covariate matrix (possibly normalized, and not including the intercept)}
 \item{covarMean}{If \code{normalize=TRUE}, the original covariate means.  Otherwise empty.}
 \item{covarSD}{If \code{normalize=TRUE}, the original covariate standard deviations.  
 Otherwise empty.}
@@ -89,6 +95,8 @@ Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
 \url{http://arxiv.org/abs/1012.2098}
 
 }
+\note{ \code{txtbin} is an undocumented utility for discretizing \code{covars} as
+specified by the \code{bins} argument}
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}
 }

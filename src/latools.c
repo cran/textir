@@ -13,7 +13,7 @@
  */
 
 void la_dgemm(int tA, int tB, int Arow, int Acol, int Brow, int Bcol, int Crow, int Ccol,
-		  double **A, double **B, double **C, double alpha, double beta)
+		  double *A, double *B, double *C, double alpha, double beta)
 {
 	char opA, opB;
 	int m, n, k, lda, ldb, ldc;
@@ -26,7 +26,7 @@ void la_dgemm(int tA, int tB, int Arow, int Acol, int Brow, int Bcol, int Crow, 
 
 	ldc = m; assert(Crow==m); assert(Ccol==n);
 
-	dgemm_(&opA,&opB,&m,&n,&k,&alpha,*A,&lda,*B,&ldb,&beta,*C,&ldc);
+	dgemm_(&opA,&opB,&m,&n,&k,&alpha,A,&lda,B,&ldb,&beta,C,&ldc);
 }
 
 
@@ -38,7 +38,7 @@ void la_dgemm(int tA, int tB, int Arow, int Acol, int Brow, int Bcol, int Crow, 
 
 
 void la_dsymm(int Alhs, int Arow, int Acol, int Brow, int Bcol, int Crow, int Ccol,
-		  double **A, double **B, double **C, double alpha, double beta)
+		  double *A, double *B, double *C, double alpha, double beta)
 {
   int m, n, lda, ldb, ldc;
   char Atri = 'L';  // reference the lower triangle of column major A. 
@@ -52,23 +52,23 @@ void la_dsymm(int Alhs, int Arow, int Acol, int Brow, int Bcol, int Crow, int Cc
   if(Alhs){  Aside='L';  assert(lda == m); }
   else{  Aside='R';  assert(lda == n); }
   
-  dsymm_(&Aside,&Atri,&m,&n,&alpha,*A,&lda,*B,&ldb,&beta,*C,&ldc);
+  dsymm_(&Aside,&Atri,&m,&n,&alpha,A,&lda,B,&ldb,&beta,C,&ldc);
 }
 
 
 /*
  * la_dposv:  lapack wrapper
  *
- * Solves the system A*X = B, where A is symmetric.
+ * Solves the system A*X = B, where A is symmetric AND positive definite.
  * Upon return, B is the solution and A contains its cholesky decomp.
  */
 
-void la_dposv(int Arow, int Bcol, double **A, double **B)
+int la_dposv(int Arow, int Bcol, double *A, double *B)
 {
   char cholTri = 'L'; // return cholesky decomp of col-major A in lower triangle
   int info;
-  dposv_(&cholTri, &Arow, &Bcol, *A, &Arow, *B, &Arow, &info);
-  assert(info==0); // if info = -i, i'th arg is wrong.  if info > A is not pos-def.
+  dposv_(&cholTri, &Arow, &Bcol, A, &Arow, B, &Arow, &info);
+  return info; // if info = -i, i'th arg is wrong.  if info > A is not pos-def.
 }
 
 
@@ -80,13 +80,43 @@ void la_dposv(int Arow, int Bcol, double **A, double **B)
  * the decomposition A = P * L * U (unit diag for L are not returned)
  */
 
-void la_dgesv(int Arow, int Bcol, double **A, double **B)
+int la_dgesv(int Arow, int Bcol, double *A, double *B)
 {
   int info;
   int *ip = new_ivec(Arow);  /* pivot indices which define P; 
 			      row i was interchanged with row ip[i]*/
-  dgesv_(&Arow, &Bcol, *A, &Arow, ip, *B, &Arow, &info);
-  assert(info==0); // if info = -i, i'th arg is wrong.  if info > 0, A is not pos-def.
+  dgesv_(&Arow, &Bcol, A, &Arow, ip, B, &Arow, &info);
+  return info; // if info = -i, i'th arg is wrong.  if info > 0, A is not pos-def.
+}
+
+
+/*
+ * la_dsysv:  lapack wrapper
+ *
+ * Solves the system A*X = B, where A is a symmetric matrix.
+ * Upon return, B is block diagonal matrix D and the
+ * multipliers used to obtain the factor U or L from the
+ * factorization A = U*D*U**T or A = L*D*L**T as computed by DSYTRF.
+ */
+
+int la_dsysv(int Arow, int Bcol, double *A, double *B)
+{
+  int info;
+  double wkopt;
+  int lwork = -1;
+  int *ipiv = new_ivec(Arow);  
+  char uplo = 'L';
+
+  dsysv_(&uplo, &Arow, &Bcol, A, &Arow, ipiv, B, &Arow, &wkopt, &lwork, &info);
+
+  lwork = (int) wkopt;
+  double *work = new_dvec(lwork);
+
+  dsysv_(&uplo, &Arow, &Bcol, A, &Arow, ipiv, B, &Arow, work, &lwork, &info);
+
+  free(work);
+  free(ipiv);
+  return info;
 }
 
 
@@ -98,12 +128,12 @@ void la_dgesv(int Arow, int Bcol, double **A, double **B)
  * 
  */
 
-void la_dpotrf(int dim, double **A)
+int la_dpotrf(int dim, double *A)
 {
   int info;
   char cholTri = 'L'; // return cholesky decomp of col-major A in lower triangle
-  dpotrf_(&cholTri,&dim,*A,&dim,&info); 
-  assert(info==0); // if info = -i, i'th arg is wrong.  if info > 0, A is not pos-def.
+  dpotrf_(&cholTri,&dim,A,&dim,&info); 
+  return info; // if info = -i, i'th arg is wrong.  if info > 0, A is not pos-def.
 }
 
 

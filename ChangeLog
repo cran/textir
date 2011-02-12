@@ -1,3 +1,11 @@
+1.2 (12 February 2011)
+---
+
+Improved handling of sparsity in large count matrices.
+Add the document tf-idf function
+Allow binning of V for faster inference with factors and large datasets.
+
+
 1.1 (21 January 2011)
 ---
 

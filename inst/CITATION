@@ -8,6 +8,6 @@ citEntry(entry = "Unpublished",
 
   textVersion  =
   paste("M. A. Taddy","(2011)",
-        "Inverse Regression for Analysis of Sentiment in Text",
-        "URL http://arxiv.org/abs/1012.2098")
+        "Inverse Regression for Analysis of Sentiment in Text,",
+        "http://arxiv.org/abs/1012.2098")
 )

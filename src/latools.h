@@ -14,8 +14,9 @@
 
 // fns from lapack
 extern void dpotrf_(char*, int*, double*, int*, int*);
-extern void dposv_(char *, int *, int *, double*, int *, double*, int *, int *);
-extern void dgesv_(int *,int *,double *,int*,int*,double*,int*,int*);
+extern void dposv_(char*, int*, int*, double*, int*, double*, int*, int*);
+extern void dgesv_(int*,int*,double*,int*,int*,double*,int*,int*);
+extern void dsysv_(char*, int*,int *,double *,int*,int*,double*,int*,double*,int*,int*);
 
 // fns from blas
 extern void dgemm_(char*, char*,  int*, int*, int*, double*,
@@ -26,13 +27,14 @@ extern void dsymm_(char*, char*, int*, int*, double*,
 // friendlier versions.  
 
 void la_dgemm(int tA, int tB, int Arow, int Acol, int Brow, int Bcol, int Crow, int Ccol,
-	      double **A, double **B, double **C, double alpha, double beta);
+	      double *A, double *B, double *C, double alpha, double beta);
 void la_dsymm(int Alhs, int Arow, int Acol, int Brow, int Bcol, int Crow, int Ccol,
-	      double **A, double **B, double **C, double alpha, double beta);
+	      double *A, double *B, double *C, double alpha, double beta);
 
-void la_dposv(int Arow, int Bcol, double **A, double **B);
-void la_dgesv(int Arow, int Bcol, double **A, double **B);
-void la_dpotrf(int dim, double **A);
+int la_dposv(int Arow, int Bcol, double *A, double *B);
+int la_dgesv(int Arow, int Bcol, double *A, double *B);
+int la_dsysv(int Arow, int Bcol, double *A, double *B);
+int la_dpotrf(int dim, double *A);
 
 // 2D double array tools.
 

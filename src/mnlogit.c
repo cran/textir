@@ -4,10 +4,9 @@
 #include "latools.h"
 #include "rhelp.h"
 #include "cubic.h"
-# ifdef _OPENMP
-#include <omp.h>
-# endif
-
+// # ifdef _OPENMP
+// #include <omp.h>
+// # endif  
 
 int n;
 int p;
@@ -37,7 +36,6 @@ double neglogpost(){
   double L = 0.0;
   int i;
   
-  #pragma omp parallel for private(i) reduction(+: L) 
   for(i=0; i<N; i++) L += -X[i]*(eta[xi[1][i]][xi[0][i]] - log(denom[xi[0][i]]));
 
   if(maplam) L += (nregpar + lampar[0] -1.0)*Bsum/(lampar[1]+Bsum);
@@ -52,7 +50,7 @@ void update(int j, int k, double bnew)
 {
   assert(j!=0);
   int i;
-  #pragma omp parallel for private(i) 
+  // #pragma omp parallel for private(i) 
   for(i=0; i<n; i++)
     { 
       denom[i] += -exp(eta[j][i]);
@@ -74,7 +72,7 @@ void calcH(int j, int k){
   double Hkj = 0.0;
   assert(D[k][j] >= 0.0);
 
-  #pragma omp parallel for private(i) reduction(+: Hkj)
+  // #pragma omp parallel for private(i) reduction(+: Hkj)
   for(i=0; i<n; i++)
     {
       double F, E, erm, erp; 
@@ -227,9 +225,8 @@ void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int
   for(j=1; j<=p; j++) for(k=1; k<d; k++) Bsum += fabs(B[k][j]);
 
   eta = new_zero_mat(n, p+1);
-  la_dgemm( 0, 1, n, d, p+1, d, n, p+1, V, B, eta, 1.0, 0.0 ); 
+  la_dgemm( 0, 1, n, d, p+1, d, n, p+1, *V, *B, *eta, 1.0, 0.0 ); 
   denom = new_dzero(n);
-#pragma omp parallel for private(i,j)
   for(i=0; i<n; i++)
     { for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); }
   if(eta[0][0]!=0.0) myprintf(stdout, "You've input nonzero null category betas; these are not updated.\n");
@@ -242,10 +239,6 @@ void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int
   /* introductory print statements */
   if(verb)
     { myprintf(stdout, "\n ** Logit-Lasso m.a.p. estimation for a %d x %d beta matrix ** \n\n", p, d);
-# ifdef _OPENMP
-#pragma omp parallel
-      if(omp_get_thread_num() == 0) myprintf(stdout, "OpenMP enabled with %d threads. \n", omp_get_num_threads()); 
-# endif
       if(maplam) myprintf(stdout, "Joint estimation for lambda under a gamma(%g,%g) prior\n", lampar[0], lampar[1]);
       myprintf(stdout, "Trust region starts at +/- %g for upper bound on info.\n\n", delta[1]);
       myprintf(stdout, "Objective L initialized at %g\n", Lout[0]); }
@@ -254,33 +247,31 @@ void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int
 
   diff = tol*100.0;
   t = 0;
-  int dozero = 1; // switch for full set updating
+  int dozero = 1; 
   int numzero;
+  double bnew;
+
   while(t<tmax && diff > tol){
     numzero = 0;
     for(j=1; j<=p; j++)
       for(k=0; k<d; k++)
-	{ 
-	  if(k==0) penalty = 0.0;
-	  else penalty = lambda;	  
-
-	  grad = G[k][j];
-	  #pragma omp parallel for private(i) reduction(+: grad)
-	  for(i=0; i<n; i++) grad += ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i];
-
-	  calcH(j, k); 
-
-	  double bnew = B[k][j];
-	  if(B[k][j] != 0.0 || penalty==0) bnew = B[k][j] + Bmove(j, k, grad, sign(B[k][j]), penalty);
-	  else if( (runif(0.0,1.0) < 0.25) || dozero) bnew = B[k][j] + Bmove(j, k, grad, 0.0, penalty);	
-     
-	  if(bnew != B[k][j])
-	    { D[k][j] = fmax(*dmin,fmax(0.5*D[k][j], 2.0*fabs(B[k][j] - bnew)));
-	      update(j, k,  bnew); assert(D[k][j] > 0.0); }
+	{ if(B[k][j] != 0.0 || penalty==0 || (runif(0.0,1.0) < 0.10) || dozero){
+	    if(k==0) penalty = 0.0;
+	    else penalty = lambda;	  
+	    
+	    grad = G[k][j];
+	    // #pragma omp parallel for private(i) reduction(+: grad)
+	    for(i=0; i<n; i++) grad += ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i];
 	  
-	  if(B[k][j] == 0.0) numzero++;
+	    calcH(j, k); 
 	  
-	}
+	    bnew = B[k][j] + Bmove(j, k, grad, sign(B[k][j]), penalty);
+	    
+	    if(bnew != B[k][j])
+	      { D[k][j] = fmax(*dmin,fmax(0.5*D[k][j], 2.0*fabs(B[k][j] - bnew)));
+		update(j, k,  bnew); assert(D[k][j] > 0.0); }
+	  }	  
+	  if(B[k][j] == 0.0) numzero++; }
     
     t++;
     
@@ -326,6 +317,30 @@ void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int
   if(maplam) free(lampar);
 }
 
+/* Fast binning of variables */
+void Rbin(int *nobs, int *dim, int *nbin, double *B, double *V, int *O){
 
+  int n = *nobs;
+  int d = *dim;
+  int b = *nbin;
+
+  double **vals = new_mat_fromv(n, d, V);
+  double **bins = new_mat_fromv(b, d, B);
+  int **ords = new_imat_fromv(n, d, O);
+
+  int i,j,k;
+
+  for(j=0; j<d; j++){
+    k = 0;
+    for(i=0; i<n; i++){
+      while( vals[j][ords[j][i]] > bins[j][k] ) k++;
+      O[j*n + ords[j][i]] = k+1;
+    }
+  }
+
+  delete_imat(ords);
+  delete_mat(bins);
+  delete_mat(vals);
+}
 
 

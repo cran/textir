@@ -30,17 +30,9 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 
 \examples{
 data(we8there)
-y <- normalize(we8thereRatings$Overall)
-F <- normalize(freq(we8thereCounts))
-fit <- pls(F, y)
+## use bins to estimate with counts collapsed across equal ratings 1...5
+fit <- mnlm(we8thereCounts, we8thereRatings$Overall, bins=5, verb=FALSE) 
+par(mfrow=c(1,2))
 plot(fit, y=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
-
-## Uncomment the following to get multinomial inverse regression.  
-## The MAP estimation can take up to 5 minutes, depending on your machine.
-# fit <- mnlm(we8thereCounts, y)
-# par(mfrow=c(1,2))
-# plot(fit, y= as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
-# plot(fit, cat=2842, delta=0.05)
-
-
+plot(fit, cat=2842, delta=0.05)
 }
