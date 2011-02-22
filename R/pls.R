@@ -53,7 +53,7 @@ tfidf <- function(x, freq=FALSE){
   if(!freq){tf <- freq(x)}
   else{tf <- x}
   
-  if(inherits(x, "simple_triplet_matrix")){ x$v <- 1 }
+  if(inherits(x, "simple_triplet_matrix")){ x$v <- rep(1, length(x$v)) }
   else{ x[x>0] <- 1 }
 
   idf <- log( nrow(x) ) - log(1+col_sums(x>0))

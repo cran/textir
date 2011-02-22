@@ -13,7 +13,7 @@ tfidf(x, freq=FALSE)
   \item{freq}{An indicator for whether \code{x} is already a frequency matrix. }
 }
 \value{
- A matrix with entries \eqn{f_{ij} \log(n/d_j)}, where \eqn{f_{ij}} is term-j frequency in document-i, 
+ A matrix with entries \eqn{f_{ij} \log[ n/(1+d_j) ]}, where \eqn{f_{ij}} is term-j frequency in document-i, 
 and \eqn{d_j} is the number of documents containing term-j.
 }
 \author{

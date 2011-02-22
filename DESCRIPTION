@@ -1,7 +1,7 @@
 Package: textir
 Title: Inverse Regression for Text Analysis
-Version: 1.2
-Date: 2011-2-12
+Version: 1.2.1
+Date: 2011-2-22
 Author: Matt Taddy <taddy@chicagobooth.edu>
 Depends: R (>= 2.4), slam
 Suggests: tm
@@ -15,6 +15,6 @@ License: LGPL
 URL: http://faculty.chicagobooth.edu/matt.taddy/index.html
 Reference: Taddy (2011), Inverse Regression for Analysis of Sentiment
         in Text, http://arxiv.org/abs/1012.2098
-Packaged: 2011-02-12 20:25:43 UTC; mtaddy
+Packaged: 2011-02-22 17:19:16 UTC; mtaddy
 Repository: CRAN
-Date/Publication: 2011-02-13 16:11:53
+Date/Publication: 2011-02-22 18:22:29
