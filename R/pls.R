@@ -37,15 +37,9 @@ pls <- function(F, y, K=1, scale=TRUE, verb=TRUE){
 
 ## converting count to frequency matrix
 freq <- function(x, byrow=TRUE){
-  if(inherits(x, "simple_triplet_matrix")){
-    f <- x
-    if(byrow){ f$v <- x$v/row_sums(x)[x$i] }
-    else{ f$v <- x$v/col_sums(x)[x$i] }
-    return(f)
-  } else{
-    if(byrow){ return( x/rowSums(x) ) }
-    else{ return(t(t(x)/colSums(x))) }
-  } }
+    if(byrow){ return( x/row_sums(x) ) }
+    else{ return(t(t(x)/col_sums(x))) }
+}
 
 ## converting a count/freq matrix to tfidf
 tfidf <- function(x, freq=FALSE){
@@ -53,25 +47,19 @@ tfidf <- function(x, freq=FALSE){
   if(!freq){tf <- freq(x)}
   else{tf <- x}
   
-  if(inherits(x, "simple_triplet_matrix")){ x$v <- rep(1, length(x$v)) }
-  else{ x[x>0] <- 1 }
-
   idf <- log( nrow(x) ) - log(1+col_sums(x>0))
-
-  if(inherits(x, "simple_triplet_matrix")){ x$v <- tf$v*idf[x$j] }
-  else{ x <- t(t(tf)*idf) }
-
+  x <- t( t(tf) * idf )
+  
   return( x ) }
 
 ## correlation for slam simple_triplet_matrix and regular matrix
 corr <- function(x, y){
   if(!inherits(x, "simple_triplet_matrix")){ return(cor(x,y) ) }
 
-  s <- sdev(x)
-  z <-  simple_triplet_matrix(i=x$i, j=x$j, v=x$v/s[x$j])
+  n <- nrow(x)
   v <- t(normalize(y))
   
-  r <- tcrossprod_simple_triplet_matrix(t(z), v)/(nrow(x)-1)
+  r <- tcrossprod_simple_triplet_matrix(t(x)/sdev(x), v)/(nrow(x)-1)
   dimnames(r) <- list(dimnames(x)[[2]], dimnames(y)[[2]])
   return( r ) }
   
@@ -79,8 +67,7 @@ corr <- function(x, y){
 sdev <- function(x){
   if(!inherits(x, "simple_triplet_matrix")){ return(apply(x,2,sd)) }
   n <- nrow(x)
-  x2 <-  simple_triplet_matrix(i=x$i, j=x$j,  v=x$v^2)
-  return( sqrt(col_sums(x2)/(n-1) - col_sums(x)^2/(n^2 - n)) ) }
+  return( sqrt(col_sums(x^2)/(n-1) - col_sums(x)^2/(n^2 - n)) ) }
 
 ##  normalizing design matrices
 normalize <- function(x, m=NULL, s=NULL){

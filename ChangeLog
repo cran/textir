@@ -1,3 +1,7 @@
+1.2.2 (23 February 2011)
+---
+Changes to corr, sdev, and tfidf to take better advantage of slam functionality
+
 1.2.1 (22 February 2011)
 ---
 Fix interaction with slam to account for package update.
