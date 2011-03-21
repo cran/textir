@@ -33,6 +33,13 @@ data(we8there)
 ## use bins to estimate with counts collapsed across equal ratings 1...5
 fit <- mnlm(we8thereCounts, we8thereRatings$Overall, bins=5, verb=FALSE) 
 par(mfrow=c(1,2))
-plot(fit, y=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
-plot(fit, cat=2842, delta=0.05)
+plot(fit, v=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
+plot(fit, cat=2426)
+
+## A small topic model (decrease 'tol' for more precision)
+tpx <- topics(we8thereCounts, K=20, tol=10)
+par(mfrow=c(1,1))
+plot(tpx, group=we8thereRatings$Overall>3, col=c(2,3), labels=c("Bad","Good"))
+summary(tpx)
+
 }

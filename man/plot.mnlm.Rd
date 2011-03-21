@@ -6,18 +6,20 @@ Multinomial logistic regression Plots
 }
 \description{ Plot function for \code{mnlm} objects, the output of multinomial logistic regression. }
 \usage{
-\method{plot}{mnlm}(x, covar=NULL, y=NULL, cat=NULL, delta=0.05, ...)
+\method{plot}{mnlm}(x, covar=NULL, v=NULL, cat=NULL, delta=0.05, xlab=NULL, ylab=NULL,...)
 }
 \arguments{
   \item{x}{An output object from the \code{mnlm} function.}
 \item{covar}{The covariate direction to plot.  Defaults to 1.}
-\item{y}{Optional argument for the response to be plotted against (if, e.g., you 
+\item{v}{Optional argument for the fitted reduction to be plotted against (if, e.g., you 
 wish to plot against unnormalized response).}
 \item{cat}{An optional category in \code{1:(ncol(fit$X))}.  If specified, plot the 
 	     conditional bound and likelihood functions for that category around
 	     the converged solution.  }
 \item{delta}{Optional argument for the delta used by the bounding function (and plot \code{xlim}) when \code{cat} is specified. 
 		      Defaults to 0.05. }
+\item{xlab}{ The x-axis label; will be automatically set if NULL. }
+\item{ylab}{ The y-axis label; will be automatically set if NULL. }
  \item{...}{Additional \code{plot} arguments}
 }
 

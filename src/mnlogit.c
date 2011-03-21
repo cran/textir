@@ -4,30 +4,25 @@
 #include "latools.h"
 #include "rhelp.h"
 #include "cubic.h"
-// # ifdef _OPENMP
-// #include <omp.h>
-// # endif  
+#include <time.h>
 
-int n;
-int p;
-int d;
-int *m;
-double *X;
-int **xi;
-int N;
-double **V;
-double **H;
-double **D;
-double **eta;
-double *denom;
-double **B;
-double **G;
-double Bsum;
-double nregpar;
+/* global variables */
 
-double lambda;
-double *lampar;
-int maplam;
+int n, p, d, N, maplam;
+double Bsum, nregpar, lambda;
+
+int dirty = 0;
+int *m = NULL;
+double *X = NULL;
+int **xi = NULL;
+double **V = NULL;
+double **eta = NULL;
+double *denom = NULL;
+double **B = NULL;
+double **G = NULL;
+double **H = NULL;
+double **D = NULL;
+double *lampar = NULL;
 
 /* un-normalized negative log posterior */
 
@@ -119,7 +114,7 @@ double findroot(int j, int k, double grad, double sgn)
   c = ghb*r*r + sgn*s/H[k][j];
 
   int ns = 0;
-  double sln;
+  double sln = 0.0;
 
   double *roots = solvecubic(a,b,c);
   int nr = roots[0];
@@ -176,8 +171,27 @@ double Bmove(int j, int k, double grad, double sgn, double pen)
   return dbet;
 }
 
+
+/* cleanup function */
+void mnlm_cleanup(){
+  if(!dirty) return;
+
+  if(m){ free(m); m = NULL; }
+  if(X){ free(X); X = NULL; }
+  if(xi){ delete_imat(xi); xi = NULL; }
+  if(V){ delete_mat(V); V = NULL; }
+  if(eta){ delete_mat(eta); eta = NULL; }
+  if(denom){ free(denom); denom = NULL; }
+  if(B){ delete_mat(B); B = NULL; }
+  if(G){ delete_mat(G); G = NULL; }
+  if(H){ delete_mat(H); H = NULL; }
+  if(D){ delete_mat(D); D = NULL; }
+  if(maplam) 
+    if(lampar){ free(lampar); lampar = NULL; }
+}
+
 /* 
- * cgd_mnlogit:
+ * Main Function: Rmnlogit
  *
  * Cyclic coordinate descent for m.a.p. estimation of multinomial
  * logistic regression coefficients under a laplace prior.  
@@ -186,14 +200,16 @@ double Bmove(int j, int k, double grad, double sgn, double pen)
  *
  */
 
-void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *niter,
+void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *niter,
 		 int *N_in, double *X_in, int *xi_in, double *V_in, double *beta_vec, double *Lout, 
 		 int *maplam_in, double *lampar_in, double *lamout, double *dmin, double *delta, int *verbalize)
 {
-  int i, j, k, l, h, t, verb;
-  double tol, tmax, grad, diff, penalty;
+  dirty = 1; // flag to say the function has been called
+  time_t itime = time(NULL);  // time stamp for periodic R interaction 
 
- 
+  int i, j, k, t, verb;
+  double tol, tmax, grad, diff;
+
   /** Build everything **/
   verb = *verbalize;
   tol = *tol_in;
@@ -215,11 +231,11 @@ void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int
   D = new_mat_fromv(p+1, d, delta);
 
   maplam = *maplam_in;
-  lambda = lampar_in[0];
-  if(maplam) 
-    { lampar = new_dup_dvec(&lampar_in[1], 2);
-      lamout[0] = lambda;  }
-  
+  if(maplam){ lampar = new_dup_dvec(lampar_in, 2); 
+    lambda = lampar[0]/lampar[1];
+    lamout[0] = lambda; }
+  else lambda = lampar_in[0];
+
   B = new_mat_fromv(p+1, d, beta_vec);
   Bsum = 0.0;
   for(j=1; j<=p; j++) for(k=1; k<d; k++) Bsum += fabs(B[k][j]);
@@ -255,7 +271,9 @@ void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int
     numzero = 0;
     for(j=1; j<=p; j++)
       for(k=0; k<d; k++)
-	{ if(B[k][j] != 0.0 || penalty==0 || (runif(0.0,1.0) < 0.10) || dozero){
+	{ if(B[k][j] != 0.0 || (runif(0.0,1.0) < 0.10) || dozero){
+
+	    double penalty;
 	    if(k==0) penalty = 0.0;
 	    else penalty = lambda;	  
 	    
@@ -271,10 +289,11 @@ void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int
 	      { D[k][j] = fmax(*dmin,fmax(0.5*D[k][j], 2.0*fabs(B[k][j] - bnew)));
 		update(j, k,  bnew); assert(D[k][j] > 0.0); }
 	  }	  
-	  if(B[k][j] == 0.0) numzero++; }
+	  if(B[k][j] == 0.0) numzero++; 
+	  itime = my_r_process_events(itime); }
     
     t++;
-    
+
     if(maplam) lamout[t] = lambda; 
     
     Lout[t] = neglogpost();
@@ -292,29 +311,17 @@ void cgd_mnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int
 	dozero = 1; } 
 
   }
-  
-  /* return new beta (and finishing deltas)*/
 
+  *niter = t+1; // total iterations
+  
+  /* return new beta (and finishing deltas) */
   for(j=0; j<=p; j++) 
     for(k=0; k<d; k++)
       { beta_vec[k*(p+1) + j] = B[k][j];
 	delta[k*(p+1) + j] = D[k][j]; }
 
-  *niter = t+1;
-
-  /* destroy everything */
-
-  free(m);
-  free(X);
-  delete_imat(xi);
-  delete_mat(V);
-  delete_mat(eta);
-  free(denom);
-  delete_mat(B);
-  delete_mat(G);
-  delete_mat(H);
-  delete_mat(D); 
-  if(maplam) free(lampar);
+  mnlm_cleanup(); // clean 
+  dirty = 0;  // normal exit
 }
 
 /* Fast binning of variables */

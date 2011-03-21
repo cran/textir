@@ -1,4 +1,4 @@
-citHeader("To cite textir in publications use:")
+citHeader("To cite textir in publications use the most appropriate of:")
 
 citEntry(entry = "Unpublished",
   title        = "Inverse Regression for Analysis of Sentiment in Text",
@@ -10,4 +10,17 @@ citEntry(entry = "Unpublished",
   paste("M. A. Taddy","(2011)",
         "Inverse Regression for Analysis of Sentiment in Text,",
         "http://arxiv.org/abs/1012.2098")
+)
+
+citEntry(entry = "Unpublished",
+  title        = "Estimation for Topic Models",
+  author       = personList(as.person("M. A. Taddy")),
+  year         = "2011",
+  note          = "in prep",
+
+  textVersion  =
+  paste("M. A. Taddy","(2011)",
+        "Estimation of Topic Models,",
+        "in prep")
+
 )

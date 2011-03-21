@@ -1,3 +1,24 @@
+1.4 (21 March 2011)
+---
+CRAN release incorporating previous v1.3 changes.
+'topics' material is lacking the companion paper, and is still in beta release.
+Added time-check to allow for escape from running c-code.
+IDF in tfidf now divides by number of containing docs plus a very tiny number.
+New predict function for 'mnlm' objects
+Updated example for congress109 now uses common-scores.
+
+1.3.1 (17 March 2011)  [Development Release]
+---
+Make the mnlm initialization more robust for huge 'p'.
+Added null category for mnlm to remove identification from the user.
+Improved binomial example for mnlm.
+mnlm now returns 'loadings' and 'intercept', instead of raw coefficients matrix
+
+1.3 (10 March 2011) [Development Release]
+---
+Functionality and documentation for topic modeling
+Added the wsj-ibm data.
+
 1.2.2 (23 February 2011)
 ---
 Changes to corr, sdev, and tfidf to take better advantage of slam functionality
@@ -6,13 +27,11 @@ Changes to corr, sdev, and tfidf to take better advantage of slam functionality
 ---
 Fix interaction with slam to account for package update.
 
-
 1.2 (12 February 2011)
 ---
 Improved handling of sparsity in large count matrices.
 Add the document tf-idf function
 Allow binning of V for faster inference with factors and large datasets.
-
 
 1.1 (21 January 2011)
 ---

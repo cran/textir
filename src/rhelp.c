@@ -119,29 +119,28 @@ void myflush(FILE *outfile)
 #else
   fflush(outfile);
 #endif
-}
+} 
 
 
 /*
  * my_r_process_events:
  *
  * at least every 1 second(s) pass control back to
- * R so that it can check for interrupts and/or 
+ * R so that it can check for interrupts and/or
  * process other R-gui events
  */
 
 time_t my_r_process_events(time_t itime)
 {
-#ifdef RPRINT  
+#ifdef RPRINT
   time_t ntime = time(NULL);
 
   if(ntime - itime > 1) {
-#if  ( defined(HAVE_AQUA) || defined(Win32) )
-    R_ProcessEvents();
-#else
-    R_CheckUserInterrupt();
-#endif
     R_FlushConsole();
+    R_CheckUserInterrupt();
+#if  (defined(HAVE_AQUA) || defined(Win32) || defined(Win64))
+    R_ProcessEvents();
+#endif
     itime = ntime;
   }
 #endif

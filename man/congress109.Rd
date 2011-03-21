@@ -41,10 +41,21 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 
 \examples{
 data(congress109)
-repshare <- normalize(congress109Ideology$repshare)
-fit <- mnlm(congress109Counts, repshare)
 
+## Inverse Regression Sentiment Modeling 
+fit <- mnlm(congress109Counts, congress109Ideology[,6:7], normalize=TRUE, tol=1)
 par(mfrow=c(1,2))
-plot(fit, pch=21, bg=c(4,3,2)[congress109Ideology$party])
-plot(fit, cat=915)
+plot(fit, v=congress109Ideology$repshare, xlab="Republican Vote-Share",
+	  covar=1, pch=21, bg=c(4,3,2)[congress109Ideology$party], main="1st common score")
+plot(fit, v=congress109Ideology$repshare, xlab="Republican Vote-Share", 
+	  covar=2, pch=21, bg=c(4,3,2)[congress109Ideology$party], main="2nd common score")
+## example usage of the predict method
+predict(fit, newcounts=congress109Counts[c(68,388),])
+
+## A small topic model 
+par(mfrow=c(1,1))
+tpx <- topics(congress109Counts, K=15)
+plot(tpx, group=congress109Ideology$party=="R", col=c(4,2), labels=c("Dem","GOP"))
+summary(tpx)
+
 }
