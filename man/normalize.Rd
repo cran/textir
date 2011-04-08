@@ -6,7 +6,7 @@ Normalize
 \description{
 Normalize matrix columns. }
 \usage{
-normalize(x, m=NULL, s=NULL)
+normalize(x, m=NULL, s=NULL, undo=FALSE)
 }
 \arguments{
   \item{x}{
@@ -14,10 +14,12 @@ normalize(x, m=NULL, s=NULL)
 }
 \item{m}{Optional column shifts.}
 \item{s}{Optional column scalings.}
+\item{undo}{If \code{undo=TRUE} this will undo a previous normalization.  Otherwise, just normalize.}
 }
 \value{
  Under default, a matrix with mean-zero and variance-one columns.  
- If shift and scale are specified, a matrix with columns shifted by \code{-m}  and divided by \code{s}. 
+ If shift and scale are specified, a matrix with columns shifted by \code{-m}  and divided by \code{s}.
+ If \code{undo=TRUE}, and shift and scale are specified, an un-normalized matrix with column means \code{m} and standard deviations \code{s}.
 }
 \note{ Not designed for huge sparse matrices. }
 \author{

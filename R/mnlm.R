@@ -1,18 +1,25 @@
 ##### Estimation for Regularized Logit Multinomial Regression  ######
 
 ## Main function; most happens in .C 
-mnlm <- function(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
-                 tol=0.1, tmax=1000, delta=1, dmin=0, bins=0, verb=TRUE)
+mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
+                 tol=0.1, tmax=1000, delta=1, dmin=0, bins=0, verb=FALSE)
 {
-
+  
   on.exit(.C("mnlm_cleanup", PACKAGE = "textir"))
   
-  ## check counts (can be an object from tm, slam, or a simple co-occurance matrix)
+  ## check counts (can be an object from tm, slam, or a simple co-occurance matrix or a factor)
+  if(is.null(dim(counts))){ 
+    counts <- as.factor(counts)
+    counts <- simple_triplet_matrix(i=1:length(counts), j=as.numeric(counts), v=rep(1,length(counts)),
+                                    dimnames=list(obsv=1:length(counts), response=levels(counts)),
+                                    nrow=length(counts), ncol=nlevels(counts)) }
   if(inherits(counts, "TermDocumentMatrix")){ counts <- t(counts) }
+  
   counts <- as.simple_triplet_matrix(counts)
   ## covariates input and check
-  covars <- as.matrix(covars)
-  if(nrow(counts) != nrow(covars)){ stop("different number of predictor and response rows") }
+  if(nrow(counts) != nrow(as.matrix(covars))){ stop("different number of predictor and response rows") }
+  if(is.null(dim(covars))){
+    covars <- matrix(covars, dimnames=list(dimnames(counts)[[1]], deparse(substitute(covars)))) }
   
   ## standardize for mean 0 variance 1.
   covarSD <- apply(covars,2,sd)
@@ -22,11 +29,11 @@ mnlm <- function(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
     { covarMean <- colMeans(covars)
       covars <- normalize(covars, m=covarMean, s=covarSD)
     }
-
+  
   ## check and possibly bin observations for fast inference
   binned <- mncheck(counts, covars, bins)
-  X <- binned$X # adds a null column onto X
-  V <- cbind(1,binned$V)
+  X <- binned$X # adds a null column onto X if ncol(X) > 2
+  V <- cbind(1, binned$V)
   
   p <- ncol(X)-1  
   n <- nrow(X)
@@ -47,17 +54,12 @@ mnlm <- function(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
   }
   else{ if(nrow(start) != p || ncol(start) != d) stop("bad starting coefficient matrix") }
   coef <- rbind(rep(0,d), start)
-
-  ## the delta step size matrix
-  Dmat <- matrix(rep(delta, d*(p+1)), ncol=d)
-  Dmat[1,] <- 0.0;
   
-  if(length(lambda)==1){ maplam <- 0 }
+  if(length(penalty)==1){ maplam <- 0 }
   else
     { maplam = 1
-      if(is.null(lambda)){ lambda <- c(p/4, p/4) }
-      else if(length(lambda) != 2 || prod(lambda>0) == 0){ stop("bad lambda argument") } }
-  lampar <- lambda
+      if(length(penalty) != 2 || prod(penalty>0) == 0){ stop("bad lambda argument") } }
+  lampar <- penalty
 
   map <- .C("Rmnlogit",
             n = as.integer(n),
@@ -72,32 +74,37 @@ mnlm <- function(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
             V = as.double(V),
             coef = as.double(coef),
             L = double(tmax + 1),
+            resids = double(length(X$v)),
+            xhat = double(length(X$v)),
             maplam = as.integer(maplam),
             lampar = as.double(lampar),
-            lambda = double(maplam*(tmax+1)),
             dmin = as.double(dmin),
-            delta = as.double(Dmat),
+            delta = as.double(delta),
             verb = as.integer(verb),
             PACKAGE="textir")
             
 
   coef <- matrix(map$coef, ncol=d)
-  delta <- matrix(map$delta, ncol=d)
-  niter <- map$niter
-  L <- map$L[1:niter]
-  if(maplam){
-    lambda <- map$lambda[1:niter]
-    lampar <- map$lampar
-  }
-  else{ lampar <- NULL }
+  L <- map$L[1:map$niter]
+  resids <- simple_triplet_matrix(i=X$i, j=X$j, v=map$resids, dimnames=dimnames(X))
+  xhat <- simple_triplet_matrix(i=X$i, j=X$j, v=map$xhat, dimnames=dimnames(X))
+
+  if(ncol(X)>2){
+    resids <- resids[,-1]
+    xhat <- xhat[,-1]
+    X <- X[,-1]
+    coef <- coef[-1,]
+  } else{ p <- p+1 }
+  
+  if(bins==0){ X=NULL; V=NULL; }
+  if(!normalize){ covarSD = NULL }
 
   ## construct the return object
-  out <- list(intercept=coef[-1,1],
-              loadings=matrix(coef[-1,-1], nrow=p, dimnames=list(phrase=dimnames(counts)[[2]], direction=dimnames(covars)[[2]])),
-              X=X, counts=counts,
-              covars=covars, V=V, covarMean=covarMean, covarSD=covarSD,
-              maplam=maplam, lampar=lampar, lambda=lambda, 
-              delta=delta, L=L, niter=niter, tol=tol, tmax=tmax, start=start)
+  out <- list(intercept=matrix(coef[,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]],"intercept")),
+              loadings=matrix(coef[,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]], covariate=dimnames(covars)[[2]])),
+              penalty=penalty, normalized=normalize, binned=bins>0,
+              X=X, counts=counts, V=V, covars=covars, covarMean=covarMean, covarSD=covarSD, 
+              L=L, residuals=resids, fitted=xhat)
   
   ## class and return
   class(out) <- "mnlm"
@@ -105,10 +112,11 @@ mnlm <- function(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
 }
 
 ## s3 plot method for mnlm
-plot.mnlm<- function(x, covar=NULL, v=NULL, cat=NULL, delta=0.05, xlab=NULL, ylab=NULL, ...)
+plot.mnlm<- function(x, type=c("response","reduction"), covar=NULL, v=NULL, xlab=NULL, ylab=NULL, col=NULL, ...)
 {
-  if(is.null(covar)){ covar <- 1 }
-  if(is.null(cat)){
+  if(type[1]=="reduction"){
+    if(is.null(covar)){ covar <- 1 }
+    if(is.null(col)){ col=1 }
     
     X <- as.simple_triplet_matrix(x$counts)
     frq <- freq(X)
@@ -116,31 +124,89 @@ plot.mnlm<- function(x, covar=NULL, v=NULL, cat=NULL, delta=0.05, xlab=NULL, yla
     else{ z <- frq%*%x$loadings[,covar] }
     
     if(is.null(v) || length(v)!=nrow(X)){
-      if(is.null(xlab)){ xlab <- paste("response ",covar) }
+      if(is.null(xlab)){ xlab <- paste("covariate ",covar) }
       v <- x$covars[,covar] }
     else if(is.null(xlab)){ xlab <- "V" }
-
+    
     if(is.null(ylab)){ ylab <- paste("fitted direction",covar) }
     
-    plot(z ~ v, xlab=xlab, ylab=ylab, ...)
+    plot(z ~ v, xlab=xlab, ylab=ylab, col=col, ...)
     legend("topleft", legend=paste("corr =", round(cor(as.numeric(v), z),2)), bty="n", cex=1.2)
   }
-  else{  coefplot(fit=x, cat=cat, covar=covar+1, xlab=xlab, ylab=ylab, delta=delta, ...) }
+  else{
+    if(ncol(x$counts)==2  && max(x$counts$v)==1){ return(binaryplot(x, xlab=xlab, ylab=ylab, col=col, ...)) }
+    if(is.null(xlab)){ xlab <- "observed count" }
+    if(is.null(ylab)){ ylab <- "fitted count" }
+    if(x$binned){ counts <- factor(x$X$v) }
+    else{ counts <- factor(x$counts$v) }
+    isfull <- counts%in%levels(counts)[table(counts)>=5]
+    if(is.null(col)){ col=rainbow(nlevels(counts)) }
+    plot(x$fitted$v ~ counts, xlab=xlab, ylab=ylab, col=col, xaxt="n", varwidth=TRUE,  ... )
+    ax <- axTicks(1)
+    ax[1] = 1
+    axis(1, at=ax)
+    points(as.numeric(counts[!isfull]), x$fitted$v[!isfull])
+  }
 }
 
  ## S3 method predict function
-predict.mnlm <- function(object, newcounts, ...)
+predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
 {
-  if(is.vector(newcounts)){ newcounts <- matrix(newcounts, nrow=1) }
-  F <- freq(as.simple_triplet_matrix(newcounts))
+  if(type[1]=="reduction"){
+    if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
+    F <- freq(as.simple_triplet_matrix(newdata))
+    
+    if(class(object)!="mnlm"){ stop("object class must be `mnlm'.") }
+    
+    phi <- object$loadings
+    if(nrow(phi) != ncol(F)){ stop("Dimension mismatch: nrow(phi) != ncol(X)") }
+    
+    return(tcrossprod_simple_triplet_matrix(F, t(phi)))
+  }
+  else{
+    if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
+    newdata <- as.matrix(newdata)
+    if(object$normalized){ newdata <- normalize(newdata, m=object$covarMean, s=object$covarSD) }
+    if(ncol(newdata)!=ncol(object$loadings)){ stop("newdata must be a matrix with the same columns as object$covars") }
+    
+    eta <- cbind(rep(1,nrow(newdata)),newdata)%*%t(cbind(object$intercept,object$loadings))
+    P <- exp(eta)/row_sums(exp(eta))
+    dimnames(P) <- list(dimnames(newdata)[[1]], probability=dimnames(object$loadings)[[1]])
+    if(ncol(P)>2){ return(P) }
+    else{ return(P[,2]) }
+  }
+}
+
+
+ ## S3 method summary function
+summary.mnlm <- function(object, y=NULL, ...){
+
+  print(object)
+
+  if(ncol(object$counts) > 2){ ps <- round(100*sum(object$loadings==0)/length(object$loadings),1) }
+  else{ ps <- round(100*sum(object$loadings[-1,]==0)/length(object$loadings[-1,]),1) }
+  cat(paste("   Loadings matrix of regression coefficients is ",
+            ps, "% sparse.\n\n", sep=""))
   
-  if(class(object)!="mnlm"){ stop("object class must be `mnlm'.") }
+  z <- predict(object, newdata=object$counts, type="reduction")
+  if(!is.null(y)){
+    reg <- lm(y~z)
+    cat(paste("   Sufficent reduction R2 for y: ", round(cor(reg$fitted,y)^2,3), " (residual scale of ", round(sd(reg$resid),3), ")\n", sep="")) }
 
-  phi <- object$loadings
-  if(nrow(phi) != ncol(F)){ stop("Dimension mismatch: nrow(phi) != ncol(X)") }
+  cat(paste("   Correlation for each fitted covariate direction:\n     "))
+  vars <- dimnames(object$covars)[[2]]
+  if(is.null(vars)){ vars <- paste("var",1:ncol(z), sep="") }
+  for( i in 1:ncol(z)){
+    cat(paste(vars[i], ": ", round(cor(z[,i], object$covars[,i]),3), ". ", sep="")) }
+  cat("\n\n")
 
-  return(tcrossprod_simple_triplet_matrix(F, t(phi))) }
+}
 
+print.mnlm <- function(x, ...){
+  if(ncol(x$counts)>2){ nr = paste(nrow(x$loadings),"response categories") }
+  else{ nr = "binary response" }
+  
+  cat(paste("\n   mnlm object for", nr, "and", ncol(x$loadings), "covariates.\n\n")) }
 
 ## cubic function solver: y = x^3 + ax^2 + bx + c
 cubic <- function(a, b, c, quiet=FALSE, plot=FALSE)
@@ -172,75 +238,13 @@ cubic <- function(a, b, c, quiet=FALSE, plot=FALSE)
 
   }
 
-#######  Undocumented "mnlm" utility functions #########
+#######  Undocumented "mnlm"-related utility functions #########
 
-## coefficient plots
-coefplot <- function(fit, cat, covar, xlab=NULL, ylab=NULL,
-                     delta=0.05, s=NULL, r=NULL,
-                     from=NULL, to=NULL, length=100, ...)
-{
-  cat <- cat+1 # shift to account for null
-  B <- cbind(fit$intercept, fit$loadings)
-  B <- rbind(rep(0,ncol(B)),B)
-  V <- fit$V
-  X <- fit$X
-  p <- nrow(B)-1
-  K <- ncol(B)-1
-  m <- row_sums(X)
-  if(fit$maplam){ if(is.null(s)){ s <- fit$lampar[1] }
-                  if(is.null(r)){ r <- fit$lampar[2] } }
-  
-  # find the converged lhd
-  eta <- V%*%t(B)
-  denom <- rowSums(exp(eta))
-  Bsum <- sum(abs(B[,-1]))
-  l <- -sum(X$v*eta[(X$j-1)*nrow(X) + X$i]) + sum(m*log(denom))
-  if(fit$maplam){
-    c <- (s+p*K-1)*Bsum/(r+Bsum)
-  } else { c <- Bsum*fit$lambda }
-  
-  g <- -sum(V[,covar]*(as.matrix(X[,cat]) - m*exp(eta[,cat])/denom))
- 
-  E <- denom - exp(eta[,cat])
-  e <- E
-  e[E<exp(eta[,cat] - delta)] <- exp(eta[,cat] - delta)[E<exp(eta[,cat] - delta)]
-  e[E>exp(eta[,cat] + delta)] <- exp(eta[,cat] + delta)[E>exp(eta[,cat] + delta)]
-
-  F <- e/E + E/e + 2
-  H <- sum(V[,covar]^2*m/F)
-
-  # grid along our chosen phi_catcovar
-  if(is.null(from)){ from <- B[cat,covar] - 1.2*delta }
-  if(is.null(to)){ to <- B[cat,covar] + 1.2*delta }
-
-  b <- seq(from, to, length=length)
-  Bcat <- matrix(rep(B[cat,],length),nrow=K+1)
-  Bcat[covar,] <- b
-  
-  l1dif <- -sum(as.matrix(X[,cat])*V[,covar])*(b - B[cat,covar])
-  denomdif <- exp(V%*%Bcat) - rep(exp(V%*%B[cat,]), length)
-  l2dif <- colSums(m*(log(denom+denomdif)-log(denom)))
-
-  Bsumvec <- Bsum + (covar>1)*(abs(b)-abs(B[cat,covar]))
-  if(fit$maplam){
-    cgrid <- (s+p*K-1)*Bsumvec/(r+Bsumvec)
-  } else{ cgrid <- fit$lambda*Bsumvec }
-
-  L <- l + l1dif + l2dif + cgrid
-  Bnd <- l + g*(b-B[cat,covar]) + 0.5*H*(b-B[cat,covar])^2  + cgrid
-
-  if(is.null(xlab)){ xlab <- paste("phi [", dimnames(X)[[2]][cat], "]") }
-  if(is.null(ylab)){ ylab <- "L( phi ) - solved objective" }
-  plot(b, L-(l+c), type="l",
-       xlab=xlab, ylab=ylab, ...)
-  points(B[cat,covar], 0, pch=20, cex=1.5, ...)
-  lines(b, Bnd-(l+c), lty=2, ...)
-
-}
-   
 mncheck <- function(X, V, bins){
 
-  if(bins<=1){ return( list(X=cbind(rep(0.01,nrow(X)),X), V=V, I=NULL) ) }             
+  if(bins<=1){
+    if(ncol(X)>2){ X <- cbind(as.vector(0.001*row_sums(X)/0.999), X) }
+    return( list(X=X, V=V, I=NULL) ) }             
 
   V <- as.matrix(V)
   R <- apply(V, 2, range)
@@ -266,9 +270,26 @@ mncheck <- function(X, V, bins){
   vals <- tapply(X$v, xij, sum) 
   ij <- matrix(as.numeric(unlist(strsplit(names(vals), split="\\."))), ncol=2, byrow=TRUE)
   Xs <- simple_triplet_matrix(i=ij[,1], j=ij[,2], v=vals, dimnames=list(I=dimnames(Vm)[[1]], cat=dimnames(X)[[2]]))
-  Xs <- cbind(rep(0.01,nrow(Xs)),Xs)
+  if(ncol(Xs)>2){ Xs <- cbind(as.vector(0.001*row_sums(Xs)/0.999),Xs) }
   
   return( list(X=Xs, V=Vm, I=as.numeric(I)) )
 
 }
-  
+
+## binary logistic regression fit plot
+binaryplot <- function( reg, response="Y", col=NULL, xlab=NULL, ylab=NULL, ...){
+  if(is.null(col)){ col <- c(2,4) }
+  if(is.null(xlab)){ xlab="Fitted Expectation" }
+  if(is.null(ylab)){ ylab="Response" }
+  mF <- max(hist(1-reg$fitted$v[reg$fitted$j==1], plot=FALSE)$density)
+  mT <- max(hist(reg$fitted$v[reg$fitted$j==2], plot=FALSE)$density)
+  if(mF>mT){
+    hist(1-reg$fitted$v[reg$fitted$j==1], main="", prob=TRUE, xlab=xlab, xlim=c(0,1),
+         col=col[1], density=20, ...) 
+    hist(reg$fitted$v[reg$fitted$j==2], add=TRUE, prob=TRUE, col=col[2], angle=135, density=20) }
+  else{
+    hist(reg$fitted$v[reg$fitted$j==2], main="", prob=TRUE, xlab=xlab, xlim=c(0,1),
+              angle=135, col=col[2], density=20,  ...) 
+    hist(1-reg$fitted$v[reg$fitted$j==1], add=TRUE, prob=TRUE, col=col[1], density=20) }
+  legend("top", fill=col, legend=c("F","T"), title=ylab, horiz=TRUE, bty="n")
+}

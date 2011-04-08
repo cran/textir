@@ -1,29 +1,42 @@
+1.5 ( 8 April 2011)
+---
+Switched to independent lambda penalties for MAP estimation.
+mnlm `lambda' input argument is now called `penalty'.
+A more friendly interface for straightforward logistic regression.
+Dropped the coefficient convergence plots and simplified mnlm output.
+New for mnlm: prediction in probability space, response fit plots, and a summary function.
+New for pls: predict, summary, and print functions.  Better plot and output labeling.
+topic modeling remains in beta release.
+
+1.4-1 (23 March 2011)
+---
+Fixed a potential color bug in plot.topics by setting explicit breaks.
+
 1.4 (21 March 2011)
 ---
-CRAN release incorporating previous v1.3 changes.
-'topics' material is lacking the companion paper, and is still in beta release.
+'topics' material lacks the companion paper, and is still in beta release.
 Added time-check to allow for escape from running c-code.
 IDF in tfidf now divides by number of containing docs plus a very tiny number.
 New predict function for 'mnlm' objects
 Updated example for congress109 now uses common-scores.
 
-1.3.1 (17 March 2011)  [Development Release]
+1.3-1 (17 March 2011)
 ---
 Make the mnlm initialization more robust for huge 'p'.
 Added null category for mnlm to remove identification from the user.
 Improved binomial example for mnlm.
 mnlm now returns 'loadings' and 'intercept', instead of raw coefficients matrix
 
-1.3 (10 March 2011) [Development Release]
+1.3 (10 March 2011)
 ---
 Functionality and documentation for topic modeling
 Added the wsj-ibm data.
 
-1.2.2 (23 February 2011)
+1.2-2 (23 February 2011)
 ---
 Changes to corr, sdev, and tfidf to take better advantage of slam functionality
 
-1.2.1 (22 February 2011)
+1.2-1 (22 February 2011)
 ---
 Fix interaction with slam to account for package update.
 

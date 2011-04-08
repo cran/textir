@@ -5,16 +5,16 @@
 Estimation for high-dimensional Multinomial Logistic Regression
 }
 \description{
-MAP estimation of Multinomial logistic regression models.  
+MAP estimation of multinomial logistic regression models.  
   }
 \usage{
-mnlm(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
-                  tol=0.1, tmax=1000, delta=1, dmin=0, bins=0, verb=TRUE)
+mnlm(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL, 
+                  tol=0.1, tmax=1000, delta=1, dmin=0, bins=0, verb=FALSE)
 }
 \arguments{
   \item{counts}{
     A matrix of multinomial response counts in \code{ncol(counts)} categories 
-    for \code{nrow(counts)} individuals/observations.  This can be a standard \code{matrix}, 
+    for \code{nrow(counts)} individuals/observations.  This can be a \code{matrix}, or a vector of response factors, 
     but for most text-analysis applications should be a \code{simple_triplet_matrix}, as defined in the \code{slam} package.
 }
   \item{covars}{
@@ -24,15 +24,13 @@ mnlm(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
  \item{normalize}{
     Whether or not to normalize the covariate matrix to have mean zero and variance one.  
 }
-\item{lambda}{
-  Either a single fixed value, or a vector of length 2 giving the gamma hyperprior prior shape and rate parameters 
-  (e.g., \code{c(s=2, r=2)} ).  Here, lambda (>0) is a joint 
+\item{penalty}{
+  Either a single fixed value, or a vector of length 2 giving the gamma hyperprior prior shape and rate parameters.
+  Here, the penalty (\eqn{\lambda>0}) is a 
   scale parameter for the Laplace prior on each non-intercept 
   regression coefficient, parametrized
    \deqn{p(b) =  (\lambda/2)exp[-\lambda|b|].}  
   Refer to Taddy (2010) for details.
-  Under the default \code{lambda=NULL}, 
-  we use \code{shape=rate=p/4}.
 }
 \item{start}{
     An initial guess for the full \code{ncol(counts)} by \code{ncol(covars)+1}
@@ -42,7 +40,7 @@ mnlm(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
     coefficients are the correlation between \code{covars} 
     and  \code{freq(counts)}.
 }
-  \item{tol}{
+\item{tol}{
   Optimization convergence tolerance for the improvement on the 
   un-normalized negative log posterior over a single full parameter sweep.
 }
@@ -60,7 +58,7 @@ mnlm(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
 	     across levels of the interaction between columns of the resulting 
 	     discrete covariate matrix, typically resulting in a smaller number of observations for estimation.}
 \item{verb}{
-   Level of print-statement output.  \code{TRUE} prints some initial info 
+   Control for print-statement output.  \code{TRUE} prints some initial info 
    and updates every iteration.
 }
 }
@@ -69,29 +67,29 @@ mnlm(counts, covars, normalize=FALSE, lambda=NULL, start=NULL,
 This is designed to be useful for inverse regression analysis of sentiment in 
 text, where the multinomial response is quite large, but should be generally useful 
 for any large-scale multinomial logistic regression. We allow for joint estimation of
-regression coefficients  and a Laplace regularization penalty.  Regression coefficients are
-identified by augmenting each response vector with a null count of 0.01
-and assuming zero coefficients for this category.
+regression coefficients  and Laplace regularization penalties.  
+For response dimension greater than two, the regression coefficients are
+identified by augmenting each response vector with a null count of 1/1000 of each observation's total
+and assuming zero coefficients for this category.  With binomial response, the first category is assumed null.
 Full details are available in Taddy (2011).   }
 \value{
  An \code{mnlm} object list with entries
 \item{intercept}{The intercept estimates for each phrase (\eqn{\alpha}).}
 \item{loadings}{The intercept estimates for each phrase (\eqn{\phi}).}
 \item{counts}{\code{simple_triplet_matrix} form of the \code{counts} input matrix}
-\item{X}{The design matrix used for analysis; includes an added null column and may have merged observations from \code{counts}.}
+\item{X}{If \code{bins>0}, the binned counts matrix used for analysis.}
 \item{covars}{The input covariates, possibly normalized.}
-\item{V}{The covariate matrix used for analysis; possibly normalized or binned, and including the intercept}
+\item{V}{If \code{bins>0}, the binned (and possibly normalized) covariate matrix used for analysis.}
+\item{normalized}{An indicator for whether the covariates were normalized.}
+\item{binned}{An indicator for whether the observations was binned.}
 \item{covarMean}{If \code{normalize=TRUE}, the original covariate means.  Otherwise empty.}
 \item{covarSD}{If \code{normalize=TRUE}, the original covariate standard deviations.  
 Otherwise empty.}
-\item{maplam}{An indicator for whether the regularization penalty was estimated.}
-\item{lampar}{Parameters (init, shape, rate) for the regularization penalty.}
-\item{lambda}{The path of \code{lambda} estimates.}
-\item{delta}{The trust region deltas upon convergence.}
 \item{L}{The unnormalized negative log posterior at each iteration.}
-\item{niter}{The number of iterations}
-\item{tol,tmax}{Convergence parameters, unchanged from input.}
-\item{start}{The initial coefficient estimates.}
+\item{residuals}{Standardized Pearson residuals, for only nonzero count entries.  
+			  In simple triplet matrix format, with empty entries for zero count observations.}
+\item{fitted}{Fitted count expectations, for only nonzero observation entries.  
+			  In simple triplet matrix format, with empty entries for zero count observations.}
 }
 \references{
    
@@ -105,27 +103,25 @@ specified by the \code{bins} argument}
   Matt Taddy \email{taddy@chicagobooth.edu}
 }
 \seealso{
-  congress109, we8there, plot.mnlm, pls
+  congress109, we8there, plot.mnlm, summary.mnlm, predict.mnlm
 }
 \examples{
 
-## See congress109 and we8there for real data examples
+## See congress109 and we8there for real multinomial data examples
 
-## Binomial simulation; re-run to see sampling variability
-n <- 20
-size <- 10
+## Bernoulli simulation; re-run to see sampling variability
+n <- 200
 v <- rnorm(n)
-p <- (1+exp(-(1 + v*2)))^{-1} 
-y <- rbinom(n, size=size, prob=p)
-counts <- cbind(size-y, y)
+p <- (1+exp(-(v*2)))^{-1} 
+y <- rbinom(n, size=1, prob=p)
 
 ## fit the logistic model
-fit <- mnlm(counts, v)
+summary( fit <- mnlm(y, v) )
+par(mfrow=c(1,2))
+plot(fit)
 
-## extract fitted probabilities
-eta <- fit$intercept + fit$loadings\%*\%t(v)
-q0 <- 1/(1+colSums(exp(eta))) # null category
-phat <- t(exp(eta))*( q0/(1-q0) )
-plot(p, phat[,2], pch=21, bg=rainbow(n), 
-	xlab="true", ylab="fitted", main="binomial probability")
+## use predict to see fitted probabilities (could also just use fit$fitted)
+phat <-  predict(fit, newdata=matrix(v,ncol=1))
+plot(p, phat, pch=21, bg=c(2,4)[y+1], xlab="true probability", ylab="fitted probability")
+
  }

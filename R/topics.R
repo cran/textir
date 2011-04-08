@@ -151,7 +151,8 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
     lbot = .35*n
     
     if(is.null(col)){ col<-1 }
-    tpcl = c(0, TOPICOLS[1:6,col%%5])
+    tpcl <- c(0, TOPICOLS[1:6,col%%5])
+    brks <- seq(0,1,length=8)
     W <- x$omega[,tpk]
     tplg <- c("w=0","w=1")
   }
@@ -165,6 +166,7 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
     if(is.null(col) || length(col)<2){ col <- 1:2 }
     
     tpcl <- c(TOPICOLS[6:1,col[1]%%5],"#FFFFFF",TOPICOLS[,col[2]%%5])
+    brks <- c(seq(-1, -0.1,length=7),seq(0.1,1,length=7))
     W <- x$omega[,tpk]*(c(-1,1)[as.logical(group)+1])
     if(is.null(labels)){labels <- c("F","T")}
     tplg=rep("w=1",2)
@@ -179,7 +181,8 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
   if(is.null(main)){ main="Topic-Loading Weights" }
 
   ## finally plot
-  image(y=1:n, x=1:length(tpk), t(W), ylab=ylab, xlab=xlab, main=main, col=tpcl, font.lab=3, xaxt="n", ...)
+  image(y=1:n, x=1:length(tpk), t(W), ylab=ylab, xlab=xlab, main=main, col=tpcl, font.lab=3, xaxt="n",
+        breaks=brks, ...)
   axis(side=1, at=1:length(tpk), labels=tpk, tick=FALSE, line=-.5)
   points(rep(xlg,length(tpcl)), seq(lbot,ltop,length=length(tpcl)), col=tpcl, pch=15, cex=3*cex.lgdc)
   text(rep(xlg,2), y=c(lbot-.08*n, ltop+.08*n), tplg, cex=cex.lgdt)

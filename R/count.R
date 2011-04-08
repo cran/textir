@@ -36,13 +36,17 @@ sdev <- function(x){
   return( sqrt(col_sums(x^2)/(n-1) - col_sums(x)^2/(n^2 - n)) ) }
 
 ##  normalizing design matrices
-normalize <- function(x, m=NULL, s=NULL){
+normalize <- function(x, m=NULL, s=NULL, undo=FALSE){
   x <- as.matrix(x)
-  if(is.null(m)){ m <- apply(x,2,mean) }
-  if(is.null(s)){ s <- apply(x,2,sd) }
-  return( t((t(x) - m)/s) ) }
-
-
+  if(!undo){
+    if(is.null(m)){ m <- apply(x,2,mean) }
+    if(is.null(s)){ s <- apply(x,2,sd) }
+    return( t((t(x) - m)/s) ) }
+  else{
+    if(is.null(m) || is.null(s)){ stop("can't un-normalize without mean and sd.") }
+    return( t( t(x)*s + m ) )}
+}
+    
 ## Dirichlet RNG
 rdir <- function(n, alpha)
 {
