@@ -108,9 +108,9 @@ specified by the \code{bins} argument}
 }
 \examples{
 
-## See congress109 and we8there for real multinomial data examples
+### See congress109 and we8there for more real data examples
 
-## Bernoulli simulation; re-run to see sampling variability
+### Bernoulli simulation; re-run to see sampling variability ###
 n <- 100
 v <- rnorm(n)
 p <- (1+exp(-(v*2)))^{-1} 
@@ -124,5 +124,19 @@ plot(fit)
 ## use predict to see fitted probabilities (could also just use fit$fitted)
 phat <-  predict(fit, newdata=matrix(v,ncol=1))
 plot(p, phat, pch=21, bg=c(2,4)[y+1], xlab="true probability", ylab="fitted probability")
+
+### Ripley's Cushing Data ###
+
+## see help(Cushings) for data
+library(MASS)
+data(Cushings)
+train <- Cushings[Cushings$Type != "u",]
+newdata <- as.matrix(Cushings[Cushings$Type == "u", 1:2])
+
+## fit, summarize, predict, and plot
+fit <- mnlm(counts=factor(train$Type), covars=as.matrix(train[,1:2]))
+summary(fit)
+predict(fit, newdata)
+plot(fit)
 
  }

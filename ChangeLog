@@ -1,7 +1,11 @@
+1.5.3 (15 April 2011)
+---
+Fixed an ommited plot (polychotomous classification) and added example for mnlm
+
 1.5.2 (14 April 2011)
 ---
 Fix bug in coefficient initialization.
-	
+
 1.5.1 (13 April 2011)
 ---
 Minor fixes in logistic regression summary and plot.

@@ -317,7 +317,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
     // print 
     if(Lout[t]!=Lout[t] || !isfinite(Lout[t]) || Lout[t] < 0){ 
       diff = 0.0;  dozero=1; 
-      myprintf(stdout, "L is NaN!  Try a larger `penalty' to prevent numeric overload. \n"); }
+      myprintf(stdout, "L is NaN!  Try a larger `penalty' or use normalize=TRUE. \n"); }
     else if(verb)
       { myprintf(stdout, "t = %d: L = %g (diff of %g) with %g%% zero loadings.\n", 
 		 t, Lout[t], diff, 100*((double) numzero)/nregpar);

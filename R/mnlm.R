@@ -157,17 +157,26 @@ plot.mnlm<- function(x, type=c("response","reduction"), covar=NULL, v=NULL, xlab
         plot(x$fitted ~ factor(as.matrix(x$counts[,2])), xlab=xlab, ylab=ylab, col=col, varwidth=TRUE, ... )
       }
     else{
-      if(is.null(xlab)){ xlab <- "observed count" }
-      if(is.null(ylab)){ ylab <- "fitted count" }
-      if(x$binned){ counts <- factor(x$X$v) }
-      else{ counts <- factor(x$counts$v) }
-      isfull <- counts%in%levels(counts)[table(counts)>=5]
-      if(is.null(col)){ col=rainbow(nlevels(counts)) }
-      plot(x$fitted$v ~ counts, xlab=xlab, ylab=ylab, col=col, xaxt="n", varwidth=TRUE,  ... )    
-      ax <- axTicks(1)
-      ax[1] = 1
-      axis(1, at=ax)
-      points(as.numeric(counts[!isfull]), x$fitted$v[!isfull])
+      if(max(x$counts)==1){
+        if(is.null(xlab)){ xlab <- "response" }
+        if(is.null(ylab)){ ylab <- "fitted probability" }
+        if(is.null(col)){ col=rainbow(ncol(x$counts)) }
+        resp <- factor(dimnames(x$counts)[[2]][x$counts$j])
+        plot(x$fitted$v ~ resp, xlab=xlab, ylab=ylab, col=col, varwidth=TRUE, ... )
+      }
+      else{
+        if(is.null(xlab)){ xlab <- "observed count" }
+        if(is.null(ylab)){ ylab <- "fitted count" }
+        if(x$binned){ counts <- factor(x$X$v) }
+        else{ counts <- factor(x$counts$v) }
+        isfull <- counts%in%levels(counts)[table(counts)>=5]
+        if(is.null(col)){ col=rainbow(nlevels(counts)) }
+        plot(x$fitted$v ~ counts, xlab=xlab, ylab=ylab, col=col, xaxt="n", varwidth=TRUE,  ... )    
+        ax <- axTicks(1)
+        ax[1] = 1
+        axis(1, at=ax)
+        points(as.numeric(counts[!isfull]), x$fitted$v[!isfull])
+      }
     }
   }
 }
