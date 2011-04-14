@@ -16,9 +16,9 @@ mnlm summary
 \details{ A short summary function for mnlm objects.
 	 }
 \value{ A printout describing the regression coefficients (dimension and sparsity) along with 
-	correlation between each covariate \code{V[,i]} and
-	the corresponding fitted inverse direction \code{freq(X)\%*\%loadings[,i]}. 
-	If \code{y} is specified, we also print the goodness-of-fit R2 for least-squares linear regression of
+	some within-sample correlations, depending on the response format.
+	If \code{y} is specified and code{ncol{object$counts}>2},
+	 we also print the goodness-of-fit R2 for least-squares linear regression of
 	\code{y} onto the sufficient reduction \code{freq(X)\%*\%loadings}. 
 }
 \references{

@@ -16,6 +16,7 @@ int *m = NULL;
 double *X = NULL;
 int **xi = NULL;
 double **V = NULL;
+double *bmax = NULL;
 double **eta = NULL;
 double *denom = NULL;
 double **B = NULL;
@@ -57,7 +58,6 @@ void update(int j, int k, double bnew)
 {
   assert(j!=0);
   int i;
-  // #pragma omp parallel for private(i) 
   for(i=0; i<n; i++)
     { 
       denom[i] += -exp(eta[j][i]);
@@ -182,7 +182,7 @@ double Bmove(int j, int k, double grad, double sgn, int pen)
   }      
 
   if(fabs(dbet) > D[k][j]) dbet = sign(dbet)*D[k][j]; // trust region bounds 
-  
+  if(fabs(B[k][j]+dbet) > bmax[k]) dbet = sign(B[k][j]+dbet)*bmax[k] - B[k][j]; // numerical overload bounds
   return dbet;
 }
 
@@ -195,6 +195,7 @@ void mnlm_cleanup(){
   if(X){ free(X); X = NULL; }
   if(xi){ delete_imat(xi); xi = NULL; }
   if(V){ delete_mat(V); V = NULL; }
+  if(bmax){ free(bmax); bmax = NULL; }
   if(eta){ delete_mat(eta); eta = NULL; }
   if(denom){ free(denom); denom = NULL; }
   if(B){ delete_mat(B); B = NULL; }
@@ -217,7 +218,7 @@ void mnlm_cleanup(){
 
 void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *niter,
 	      int *N_in, double *X_in, int *xi_in, double *V_in, 
-	      double *beta_vec, double *Lout, double *resids, double *fitted,
+	      double *beta_vec, double *bmax_in, double *Lout, double *resids, double *fitted,
 	      int *maplam_in, double *lam_in, double *dmin, double *delta, int *verbalize)
 {
   dirty = 1; // flag to say the function has been called
@@ -240,6 +241,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   X = new_dup_dvec(X_in, N);
   xi = new_imat_fromv(N, 2, xi_in);
   V = new_mat_fromv(n, d, V_in);
+  bmax = new_dup_dvec(bmax_in, d);
   H = new_zero_mat(p+1, d);  
   D = new_mat(p+1, d);
   for(j=0; j<=p; j++) for(k=0; k<d; k++) D[k][j] = delta[0]; 
@@ -255,14 +257,21 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   eta = new_zero_mat(n, p+1);
   la_dgemm( 0, 1, n, d, p+1, d, n, p+1, *V, *B, *eta, 1.0, 0.0 ); 
   denom = new_dzero(n);
-  for(i=0; i<n; i++)
-    { for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); }
+  for(i=0; i<n; i++) for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); 
   if(eta[0][0]!=0.0) myprintf(stdout, "You've input nonzero null category betas; these are not updated.\n");
 
   G = new_zero_mat(p+1, d);
   for(i=0; i<N; i++) for(k=0; k<d; k++) G[k][xi[1][i]] += -X[i]*V[k][xi[0][i]]; 
 
   Lout[0] = neglogpost();
+  if(isinf(Lout[0])){  
+    myprintf(stdout, "\nInfinite initial fit; starting at zero instead.  Perhaps try `normalize=TRUE'.\n");
+    for(j=0; j<=p; j++) for(k=0; k<d; k++) B[k][j] = 0.0;
+    for(i=0; i<n; i++)
+      { for(j=0; j<=p; j++) eta[j][i] = 0.0;
+	denom[i] = ((double) p) + 1.0; }
+    Lout[0]  = neglogpost(); }
+    
   diff = tol*100.0;
   t = 0;
   int dozero = 1; 
@@ -271,7 +280,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
 
   /* introductory print statements */
   if(verb)
-    { myprintf(stdout, "\nLogistic Regression with a %d x %d coefficient matrix\n", p, d);
+    { myprintf(stdout, "*** Logistic Regression with a %d x %d coefficient matrix ***\n", p, d);
       if(maplam) myprintf(stdout, "Joint MAP penalty estimation under a gamma(%g,%g) prior\n", lam[0], lam[1]);
       else myprintf(stdout, "Estiamtion with L1 penalty of %g\n\n", lam[0]);
       myprintf(stdout, "Objective L initialized at %g\n", Lout[0]); }
@@ -283,7 +292,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
     // loop through coefficient
     for(j=1; j<=p; j++)
       for(k=0; k<d; k++)
-	{ if(B[k][j] != 0.0 || (runif(0.0,1.0) < 0.1) || dozero || k==0){
+	{ if(B[k][j] != 0.0 || dozero || k==0 || t < 3){
 	    // gradient
 	    grad = G[k][j];
 	    for(i=0; i<n; i++) grad += ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i];
@@ -306,8 +315,10 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
     diff = Lout[t-1] - Lout[t];
     
     // print 
-    if(Lout[t]!=Lout[t]){ diff = 0.0;  myprintf(stdout, "\nL is nan! Probably due to tiny lambda. \n"); }
-    if(verb)
+    if(Lout[t]!=Lout[t] || !isfinite(Lout[t]) || Lout[t] < 0){ 
+      diff = 0.0;  dozero=1; 
+      myprintf(stdout, "L is NaN!  Try a larger `penalty' to prevent numeric overload. \n"); }
+    else if(verb)
       { myprintf(stdout, "t = %d: L = %g (diff of %g) with %g%% zero loadings.\n", 
 		 t, Lout[t], diff, 100*((double) numzero)/nregpar);
 	if(t==tmax) myprintf(stdout, "Terminating optimization; exhausted max number of iterations.\n"); }

@@ -1,6 +1,5 @@
 \name{plot.mnlm}
 \alias{plot.mnlm}
-\alias{binaryplot}
 \title{
 Multinomial logistic regression Plots
 }
@@ -28,7 +27,6 @@ wish to plot against unnormalized response).}
 	  inverse regression based on this \code{mnlm} fit.  }
 
 \value{ A fabulous plot.}
-\note{ \code{binaryplot} is an internal function for binary choice data plots. }
 \references{
    
 Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.

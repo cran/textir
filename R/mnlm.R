@@ -40,14 +40,19 @@ mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
   m <- row_sums(X)
   d <- ncol(V)
   
+  vmax <- apply(abs(V),2,max)
+  bmax <- log(10^6)/vmax
+
   ## initialization for the coefficient estimates
   if(is.null(start)){
     if(verb){ cat("Finding initial coefficient estimates... ") }
     F <- freq(X)
     phi <- NULL
-    if(p<=10000){ phi <- suppressWarnings(try(corr(F[,-1],V[,-1]), silent=TRUE)) }
-    if(p > 10000 || class(phi)=="try-error"){
-      phi <- tcrossprod_simple_triplet_matrix(t(F[,-1]),t(matrix(V[,-1], ncol=d-1))) }
+    if(d >= 100){ phi <- matrix(0, nrow=p, ncol=d-1) }
+    else if(p<=10000){ phi <- suppressWarnings(try(corr(F[,-1],V[,-1]), silent=TRUE)) }
+    if(d < 100 && p > 10000 || class(phi)=="try-error"){
+      phi <- tcrossprod_simple_triplet_matrix(t(F[,-1]),t(matrix(V[,-1], ncol=d-1)))
+    }
     q <- col_means(F)
     start <- cbind( log(q[-1])-log(q[1]), phi)
     if(verb){ cat("done.\n") }
@@ -73,6 +78,7 @@ mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
             xi = as.integer(cbind(X$i,X$j)-1),
             V = as.double(V),
             coef = as.double(coef),
+            bmax = as.double(bmax),
             L = double(tmax + 1),
             resids = double(length(X$v)),
             xhat = double(length(X$v)),
@@ -91,17 +97,23 @@ mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
 
   if(ncol(X)>2){
     resids <- resids[,-1]
-    xhat <- xhat[,-1]
+    xhat <- xhat[,-1]*1.001
     X <- X[,-1]
-    coef <- coef[-1,]
-  } else{ p <- p+1 }
+    intercept <- matrix(coef[-1,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]],"intercept"))
+    loadings <- matrix(coef[-1,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]], covariate=dimnames(covars)[[2]]))
+  } else{
+    if(max(counts)==1){ xhat <- as.matrix(xhat)
+                        xhat[xhat[,2]==0,2] <- 1 - xhat[xhat[,2]==0,1]
+                        xhat <- xhat[,2] }
+    intercept <- matrix(coef[-1,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]][-1],"intercept"))
+    loadings <- matrix(coef[-1,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]][-1], covariate=dimnames(covars)[[2]]))
+    p <- p+1 }
   
   if(bins==0){ X=NULL; V=NULL; }
   if(!normalize){ covarSD = NULL }
 
   ## construct the return object
-  out <- list(intercept=matrix(coef[,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]],"intercept")),
-              loadings=matrix(coef[,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]], covariate=dimnames(covars)[[2]])),
+  out <- list(intercept=intercept, loadings=loadings,
               penalty=penalty, normalized=normalize, binned=bins>0,
               X=X, counts=counts, V=V, covars=covars, covarMean=covarMean, covarSD=covarSD, 
               L=L, residuals=resids, fitted=xhat)
@@ -115,6 +127,10 @@ mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
 plot.mnlm<- function(x, type=c("response","reduction"), covar=NULL, v=NULL, xlab=NULL, ylab=NULL, col=NULL, ...)
 {
   if(type[1]=="reduction"){
+    if(ncol(x$counts)<=2){
+      cat("No useful sufficient reductions for a binary response.  Use type=`repsonse' instead.\n") 
+      return(invisible()); }
+
     if(is.null(covar)){ covar <- 1 }
     if(is.null(col)){ col=1 }
     
@@ -134,18 +150,25 @@ plot.mnlm<- function(x, type=c("response","reduction"), covar=NULL, v=NULL, xlab
     legend("topleft", legend=paste("corr =", round(cor(as.numeric(v), z),2)), bty="n", cex=1.2)
   }
   else{
-    if(ncol(x$counts)==2  && max(x$counts$v)==1){ return(binaryplot(x, xlab=xlab, ylab=ylab, col=col, ...)) }
-    if(is.null(xlab)){ xlab <- "observed count" }
-    if(is.null(ylab)){ ylab <- "fitted count" }
-    if(x$binned){ counts <- factor(x$X$v) }
-    else{ counts <- factor(x$counts$v) }
-    isfull <- counts%in%levels(counts)[table(counts)>=5]
-    if(is.null(col)){ col=rainbow(nlevels(counts)) }
-    plot(x$fitted$v ~ counts, xlab=xlab, ylab=ylab, col=col, xaxt="n", varwidth=TRUE,  ... )
-    ax <- axTicks(1)
-    ax[1] = 1
-    axis(1, at=ax)
-    points(as.numeric(counts[!isfull]), x$fitted$v[!isfull])
+    if(is.vector(x$fitted)){
+        if(is.null(xlab)){ xlab <- "response" }
+        if(is.null(ylab)){ ylab <- "fitted probability" }
+        if(is.null(col)){ col=c(2,4) }
+        plot(x$fitted ~ factor(as.matrix(x$counts[,2])), xlab=xlab, ylab=ylab, col=col, varwidth=TRUE, ... )
+      }
+    else{
+      if(is.null(xlab)){ xlab <- "observed count" }
+      if(is.null(ylab)){ ylab <- "fitted count" }
+      if(x$binned){ counts <- factor(x$X$v) }
+      else{ counts <- factor(x$counts$v) }
+      isfull <- counts%in%levels(counts)[table(counts)>=5]
+      if(is.null(col)){ col=rainbow(nlevels(counts)) }
+      plot(x$fitted$v ~ counts, xlab=xlab, ylab=ylab, col=col, xaxt="n", varwidth=TRUE,  ... )    
+      ax <- axTicks(1)
+      ax[1] = 1
+      axis(1, at=ax)
+      points(as.numeric(counts[!isfull]), x$fitted$v[!isfull])
+    }
   }
 }
 
@@ -153,6 +176,9 @@ plot.mnlm<- function(x, type=c("response","reduction"), covar=NULL, v=NULL, xlab
 predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
 {
   if(type[1]=="reduction"){
+    if(ncol(object$counts)<=2){
+      cat("No useful sufficient reductions for a binary response.  Use type=`repsonse' instead.\n") 
+      return(invisible()); }
     if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
     F <- freq(as.simple_triplet_matrix(newdata))
     
@@ -170,10 +196,10 @@ predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
     if(ncol(newdata)!=ncol(object$loadings)){ stop("newdata must be a matrix with the same columns as object$covars") }
     
     eta <- cbind(rep(1,nrow(newdata)),newdata)%*%t(cbind(object$intercept,object$loadings))
-    P <- exp(eta)/row_sums(exp(eta))
+    if(ncol(eta)==1){ P <- exp(eta)/(1+exp(eta)) }
+    else{ P <- exp(eta)/row_sums(exp(eta)) }
     dimnames(P) <- list(dimnames(newdata)[[1]], probability=dimnames(object$loadings)[[1]])
-    if(ncol(P)>2){ return(P) }
-    else{ return(P[,2]) }
+    return(P)
   }
 }
 
@@ -183,23 +209,44 @@ summary.mnlm <- function(object, y=NULL, ...){
 
   print(object)
 
-  if(ncol(object$counts) > 2){ ps <- round(100*sum(object$loadings==0)/length(object$loadings),1) }
-  else{ ps <- round(100*sum(object$loadings[-1,]==0)/length(object$loadings[-1,]),1) }
-  cat(paste("   Loadings matrix of regression coefficients is ",
+  ps <- round(100*sum(object$loadings==0)/length(object$loadings),1) 
+  cat(paste("   Loadings matrix is ",
             ps, "% sparse.\n\n", sep=""))
   
-  z <- predict(object, newdata=object$counts, type="reduction")
-  if(!is.null(y)){
-    reg <- lm(y~z)
-    cat(paste("   Sufficent reduction R2 for y: ", round(cor(reg$fitted,y)^2,3), " (residual scale of ", round(sd(reg$resid),3), ")\n", sep="")) }
-
-  cat(paste("   Correlation for each fitted covariate direction:\n     "))
-  vars <- dimnames(object$covars)[[2]]
-  if(is.null(vars)){ vars <- paste("var",1:ncol(z), sep="") }
-  for( i in 1:ncol(z)){
-    cat(paste(vars[i], ": ", round(cor(z[,i], object$covars[,i]),3), ". ", sep="")) }
-  cat("\n\n")
-
+  if(ncol(object$counts)>2){
+    z <- predict(object, newdata=object$counts, type="reduction") 
+    if(!is.null(y)){
+      reg <- lm(y~z)
+      cat(paste("   Sufficent reduction R2 for y: ", round(cor(reg$fitted,y)^2,3),
+                " (residual scale of ", round(sd(reg$resid),3), ")\n", sep="")) }
+    
+    cat(paste("   Correlations in each sufficient reduction direction:\n     "))
+    vars <- dimnames(object$covars)[[2]]
+    if(is.null(vars)){ vars <- paste("var",1:ncol(z), sep="") }
+    for( i in 1:ncol(z)){
+      cat(paste(vars[i], ": ", round(cor(z[,i], object$covars[,i]),3), ". ", sep="")) }
+    cat("\n\n")
+  }
+  else{
+    if(is.vector(object$fitted)){
+      cat(paste("   False positives and negatives:\n "))
+      cuts <- c(.1,.25,.5,.75,.9)
+      F <- matrix(nrow=2,ncol=5, dimnames=list(c("    %fp","    %fn"),
+                                   " classification cut-off" = cuts)) 
+      for(i in 1:5){
+        p <- object$fitted >= cuts[i];
+        q <- object$fitted < cuts[i];
+        F[1,i] <- sum(as.matrix(object$counts)[p,1])/sum(p)
+        F[2,i] <- sum(as.matrix(object$counts)[q,2])/sum(q) }
+      F[is.na(F)] <- 0
+      print(round(F*100,1))
+      cat("\n")
+    }
+    else{
+      cat("   cor(counts,fitted) =",paste(round(cor(object$fitted$v, object$counts$v),2),
+                "for nonzero entries.\n\n"))
+    }
+  }
 }
 
 print.mnlm <- function(x, ...){
@@ -274,22 +321,4 @@ mncheck <- function(X, V, bins){
   
   return( list(X=Xs, V=Vm, I=as.numeric(I)) )
 
-}
-
-## binary logistic regression fit plot
-binaryplot <- function( reg, response="Y", col=NULL, xlab=NULL, ylab=NULL, ...){
-  if(is.null(col)){ col <- c(2,4) }
-  if(is.null(xlab)){ xlab="Fitted Expectation" }
-  if(is.null(ylab)){ ylab="Response" }
-  mF <- max(hist(1-reg$fitted$v[reg$fitted$j==1], plot=FALSE)$density)
-  mT <- max(hist(reg$fitted$v[reg$fitted$j==2], plot=FALSE)$density)
-  if(mF>mT){
-    hist(1-reg$fitted$v[reg$fitted$j==1], main="", prob=TRUE, xlab=xlab, xlim=c(0,1),
-         col=col[1], density=20, ...) 
-    hist(reg$fitted$v[reg$fitted$j==2], add=TRUE, prob=TRUE, col=col[2], angle=135, density=20) }
-  else{
-    hist(reg$fitted$v[reg$fitted$j==2], main="", prob=TRUE, xlab=xlab, xlim=c(0,1),
-              angle=135, col=col[2], density=20,  ...) 
-    hist(1-reg$fitted$v[reg$fitted$j==1], add=TRUE, prob=TRUE, col=col[1], density=20) }
-  legend("top", fill=col, legend=c("F","T"), title=ylab, horiz=TRUE, bty="n")
 }

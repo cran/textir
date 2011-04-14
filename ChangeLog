@@ -1,4 +1,13 @@
-1.5 ( 8 April 2011)
+1.5.2 (14 April 2011)
+---
+Fix bug in coefficient initialization.
+	
+1.5.1 (13 April 2011)
+---
+Minor fixes in logistic regression summary and plot.
+Add a coefficient bound to avoid infinite denominator under almost complete separation.
+
+1.5 (8 April 2011)
 ---
 Switched to independent lambda penalties for MAP estimation.
 mnlm `lambda' input argument is now called `penalty'.

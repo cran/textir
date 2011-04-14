@@ -88,8 +88,9 @@ Otherwise empty.}
 \item{L}{The unnormalized negative log posterior at each iteration.}
 \item{residuals}{Standardized Pearson residuals, for only nonzero count entries.  
 			  In simple triplet matrix format, with empty entries for zero count observations.}
-\item{fitted}{Fitted count expectations, for only nonzero observation entries.  
-			  In simple triplet matrix format, with empty entries for zero count observations.}
+\item{fitted}{Fitted count expectations.  With binary response, this is a vector of fitted probabilities. 
+	For binomial or multinomial response, it is a simple triplet matrix
+	 with empty entries for zero count observations.}
 }
 \references{
    
@@ -110,7 +111,7 @@ specified by the \code{bins} argument}
 ## See congress109 and we8there for real multinomial data examples
 
 ## Bernoulli simulation; re-run to see sampling variability
-n <- 200
+n <- 100
 v <- rnorm(n)
 p <- (1+exp(-(v*2)))^{-1} 
 y <- rbinom(n, size=1, prob=p)
