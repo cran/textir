@@ -137,6 +137,7 @@ newdata <- as.matrix(Cushings[Cushings$Type == "u", 1:2])
 fit <- mnlm(counts=factor(train$Type), covars=as.matrix(train[,1:2]))
 summary(fit)
 predict(fit, newdata)
+par(mfrow=c(1,1))
 plot(fit)
 
  }

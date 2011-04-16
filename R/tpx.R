@@ -27,31 +27,35 @@ tpxBF <- function(X, K, initheta, alpha, tol, kill, verb, init=FALSE, ...){
 
     ## Solve for map omega in NEF space
     fit <- tpxfit(X=X, theta=initheta, alpha=alpha, tol=tol, verb=verb, ml=TRUE, ...)
-    BF <- c(BF, tpxML(X=X, theta=fit$theta, omega=fit$omega, alpha=fit$alpha) - null)
-    if(verb>0 && !init) cat(paste("log BF(", K[i], ") =", round(BF[i],2)))
-    if(verb>1 && !init) cat(paste(" [", fit$iter,"steps ]\n")) else if(verb >0) cat("\n")
-    if(init) cat(paste(K[i],",", sep=""))
+    if(!init){ BF <- c(BF, tpxML(X=X, theta=fit$theta, omega=fit$omega, alpha=fit$alpha) - null)
+               if(verb>0) cat(paste("log BF(", K[i], ") =", round(BF[i],2)))
+               if(verb>1) cat(paste(" [", fit$iter,"steps ]\n")) else if(verb >0) cat("\n")
     
-    if(is.nan(BF[i])){ 
-      cat("NAN for Bayes factor.\n")
-      return(bestfit)
-      break}
+               if(is.nan(BF[i])){ 
+                 cat("NAN for Bayes factor.\n")
+                 return(bestfit)
+                 break} 
     
-    if(BF[i] > best){ # check for a new "best" topic
-      best <- BF[i]
-      bestfit <- fit
-    } else if(kill>0 && i>kill){ # break after kill consecutive drops
-      if(prod(BF[i-0:(kill-1)] < BF[i-1:kill])==1) break; }
-
+               if(BF[i] > best){ # check for a new "best" topic
+                 best <- BF[i]
+                 bestfit <- fit
+               } else if(kill>0 && i>kill){ # break after kill consecutive drops
+                 if(prod(BF[i-0:(kill-1)] < BF[i-1:kill])==1) break; }
+             }
+    else{ cat(paste(K[i],",", sep="")) }
+    
     if(i<nK){ # new topic from residuals
       R <- tpxresids(X, theta=fit$theta, omega=fit$omega)
       rX$v <- R$e*(R$r>3) + 1/p
       initheta <- cbind(freq(K[i]*fit$theta+rowMeans(fit$theta), byrow=FALSE), tpxThetaInit(rX, K[i+1]-K[i])) } 
- 
   }
-  names(BF) <- paste(K[1:length(BF)])
-  if(kill==0){k<-nK}
-  else{k<-which.max(BF)}
+  if(!init){
+    names(BF) <- paste(K[1:length(BF)]) 
+    k<-which.max(BF) }
+  else{
+    k<-nK
+    bestfit <- fit
+  }
   return(list(theta=bestfit$theta, omega=bestfit$omega, alpha=bestfit$alpha, BF=BF, K=K[k])) }
 
 ## ** called from topics.R and tpx.R

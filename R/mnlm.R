@@ -9,10 +9,9 @@ mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
   
   ## check counts (can be an object from tm, slam, or a simple co-occurance matrix or a factor)
   if(is.null(dim(counts))){ 
-    counts <- as.factor(counts)
+    counts <- factor(counts)
     counts <- simple_triplet_matrix(i=1:length(counts), j=as.numeric(counts), v=rep(1,length(counts)),
-                                    dimnames=list(obsv=1:length(counts), response=levels(counts)),
-                                    nrow=length(counts), ncol=nlevels(counts)) }
+                                    dimnames=list(NULL, response=levels(counts))) }
   if(inherits(counts, "TermDocumentMatrix")){ counts <- t(counts) }
   
   counts <- as.simple_triplet_matrix(counts)
@@ -186,7 +185,7 @@ predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
 {
   if(type[1]=="reduction"){
     if(ncol(object$counts)<=2){
-      cat("No useful sufficient reductions for a binary response.  Use type=`repsonse' instead.\n") 
+      cat("No useful sufficient reductions for a binary response.  Use type=`response' instead.\n") 
       return(invisible()); }
     if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
     F <- freq(as.simple_triplet_matrix(newdata))
@@ -228,13 +227,16 @@ summary.mnlm <- function(object, y=NULL, ...){
       reg <- lm(y~z)
       cat(paste("   Sufficent reduction R2 for y: ", round(cor(reg$fitted,y)^2,3),
                 " (residual scale of ", round(sd(reg$resid),3), ")\n", sep="")) }
-    
-    cat(paste("   Correlations in each sufficient reduction direction:\n     "))
-    vars <- dimnames(object$covars)[[2]]
-    if(is.null(vars)){ vars <- paste("var",1:ncol(z), sep="") }
-    for( i in 1:ncol(z)){
-      cat(paste(vars[i], ": ", round(cor(z[,i], object$covars[,i]),3), ". ", sep="")) }
-    cat("\n\n")
+
+    if(ncol(object$covars)<=10){
+      cat(paste("   Correlations in each sufficient reduction direction:\n     "))
+      vars <- dimnames(object$covars)[[2]]
+      if(is.null(vars)){ vars <- paste("var",1:ncol(z), sep="") }
+      for( i in 1:ncol(z)){
+        cat(paste(vars[i], ": ", round(cor(z[,i], object$covars[,i]),3), ". ", sep="")) }
+      cat("\n")
+    }
+    cat("\n")
   }
   else{
     if(is.vector(object$fitted)){

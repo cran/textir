@@ -1,13 +1,9 @@
-1.5.3 (15 April 2011)
+1.5-4 (16 April 2011)
 ---
+Fixed a strange bug with summary for factor response input.  Letting slam
+	specify its own `counts' matrix dimensions on imput seems to solve things.
 Fixed an ommited plot (polychotomous classification) and added example for mnlm
-
-1.5.2 (14 April 2011)
----
-Fix bug in coefficient initialization.
-
-1.5.1 (13 April 2011)
----
+Fixed a bug in coefficient initialization.
 Minor fixes in logistic regression summary and plot.
 Add a coefficient bound to avoid infinite denominator under almost complete separation.
 

@@ -16,7 +16,7 @@ mnlm summary
 \details{ A short summary function for mnlm objects.
 	 }
 \value{ A printout describing the regression coefficients (dimension and sparsity) along with 
-	some within-sample correlations, depending on the response format.
+	some within-sample correlations or error rates, depending on response and covariate formats.
 	If \code{y} is specified and code{ncol{object$counts}>2},
 	 we also print the goodness-of-fit R2 for least-squares linear regression of
 	\code{y} onto the sufficient reduction \code{freq(X)\%*\%loadings}. 
