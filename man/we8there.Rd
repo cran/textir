@@ -6,7 +6,7 @@
 \title{ On-Line Restaurant Reviews }
 
 \description{
-Counts for 2978 bigrams in 6147 restaurant reviews from the site www.we8there.com. }
+Counts for 2804 bigrams in 6175 restaurant reviews from the site www.we8there.com. }
 
 \details{ The short user-submitted reviews are accompanied by a five-star rating on four specific aspects of restaurant quality - food, service, value, and atmosphere - as well as the overall experience.  The reviews originally appear in Maua and Cozman (2009), and the parsing details behind these specific counts are in Taddy (2011). }
 
@@ -37,8 +37,8 @@ par(mfrow=c(1,2))
 plot(fit, type="reduction", v=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
 plot(fit) # type = "response" default
 
-## A small topic model (decrease 'tol' for more precision)
-tpx <- topics(we8thereCounts, K=20, tol=10)
+## A small topic model
+tpx <- topics(we8thereCounts, K=10, tol=0.1)
 par(mfrow=c(1,1))
 plot(tpx, group=we8thereRatings$Overall>3, col=c(2,3), labels=c("Bad","Good"))
 summary(tpx)

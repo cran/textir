@@ -1,3 +1,14 @@
+1.6 (1 June 2011)
+---
+Added the option for basic mixture modeling with admix=FALSE
+New tpxSelect function, replacing tpxBF.  Cleaner initialization.
+Fixed a bug in BF calculation; now appears very consistent.
+Fixed stemming in we8there
+Move to `lift' terminology for summary
+Add dispersion estimation and summary
+Move to concentration=1+shape parameterization
+	and introduce capability for full matrix shape
+
 1.5-4 (16 April 2011)
 ---
 Fixed a strange bug with summary for factor response input.  Letting slam

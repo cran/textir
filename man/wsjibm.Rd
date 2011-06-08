@@ -28,8 +28,24 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 
 \examples{
 data(wsjibm)
-## fit a small topic model
-newstpx <- topics(wsjibmCounts, K=5, tol=1) 
-plot(newstpx, group=wsjibmReturns$ROM>=0, labels=c("loss","gain"), col=c(2,1))
+## fit a simple finite mixture model (not the usual mixed-membership admix)
+## allow different topic-membership probabilities by gain/loss
+newstpx <- topics(wsjibmCounts, K=10, admix=FALSE, grp=wsjibmReturns$ROM>=0) 
+plot(newstpx,3, col=3, cex.lgdc=.6, ylab="gain")
 summary(newstpx, nwrd=10)
+
+## fit admixture topics over years, using prior shape to allow them to change in time
+year <- factor(1900 + as.POSIXlt(wsjibmReturns$DATE)$year)
+Y <- nlevels(year)
+annualtopics <- vector(length=Y, mode="list")
+topwords <- array(dim=c(5,4,Y))
+shape=NULL
+for(i in 1:Y){ 
+      annualtopics[[i]] <- topics(wsjibmCounts[year==levels(year)[i],], K=4, shape=shape)
+      topwords[,,i] <- summary(annualtopics[[i]], verb=FALSE)
+      delta <- 100 # weight of the previous year in number of words observed per topic		
+      shape <- annualtopics[[i]]$theta*delta }
+## top 5 words by year in the first topic
+print(t(topwords[,1,]))	   	  	         
+
 }

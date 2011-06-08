@@ -14,9 +14,9 @@ cex.lgdc = 1, cex.lgdt = 1, cex.rmar= 1, ... )
   \item{x}{An output object from the \code{topics} function.}
 \item{type}{If "weight", the default, provide an image plot of document-topic weights. 
 	    If "resid", just show a simple histogram of standardized residuals for the positive count entries. }
-\item{group}{ Optional \code{logical} vector containing membership in some group for each document 
-(e.g., good reviews for the we8there data, or republicans in the congress109 example). 
-This will be used to color the topic-weight shadings.}
+\item{group}{ Optional \code{logical} vector containing membership in some group for each document;
+this will be used to color the topic-weight shadings.  Does not apply if \code{!x$admix}.
+See the \code{textir} dataset examples, which color by good reviews for the we8there data or by republicans in congress109.}
 \item{labels}{ Optional length-two \code{character} vector of labels for the membership specified in \code{groups}.
 \code{labels[1]} corresponds to \code{group=FALSE} and \code{labels[2]} to \code{group=TRUE}. }
 \item{col}{ If \code{type="weight"}, a number from \code{1:4} specifying the shade color (grey, followed by red, green blue).  
