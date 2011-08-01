@@ -34,3 +34,24 @@ Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
 \seealso{
   mnlm, congress109
 }
+
+\examples{
+## fit a congress 109 mnlm model using a random 300 members
+data(congress109)
+train <- sample(1:529, 300)
+counts <- congress109Counts[,col_sums(congress109Counts[train,])>0]
+fitRep <- mnlm(counts[train,], congress109Ideology$repshare[train], normalize=TRUE, bins=10)
+
+## extract the reduced dimension text score
+Z <- predict(fitRep, newdata=counts[train,], type="reduction")
+
+## use this to build a forward regression model
+fwdRep <- lm(repshare ~ Z, data=data.frame(repshare=congress109Ideology$repshare[train], Z=Z[,1]) )
+
+## predict scores for the out-of-sample members
+Znew <- predict(fitRep, newdata=counts[-train,], type="reduction")
+predicted <- predict(fwdRep, newdata=data.frame(Z=Znew[,1]))
+plot(congress109Ideology$repshare[-train], predicted, 
+     pch=21, bg=c(4,3,2)[congress109Ideology$party[-train]], xlab="repshare")
+abline(a=0,b=1, col=8) 
+}

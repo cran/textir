@@ -1,8 +1,14 @@
-1.6 (1 June 2011)
+1.6-1 (1 Aug 2011)
+---
+Small update to we8there and congress data examples
+Added example of lm in fwd regression for predict
+Add lift in return object from summary for topics
+
+1.6 (8 June 2011)
 ---
 Added the option for basic mixture modeling with admix=FALSE
 New tpxSelect function, replacing tpxBF.  Cleaner initialization.
-Fixed a bug in BF calculation; now appears very consistent.
+Fixed a small bug in BF calculation; now appears very solid.
 Fixed stemming in we8there
 Move to `lift' terminology for summary
 Add dispersion estimation and summary

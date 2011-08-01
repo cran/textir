@@ -92,19 +92,23 @@ summary.topics <- function(object, nwrd=5, tpk=NULL, verb=TRUE, ...){
   if(nwrd>0){ if(verb){ cat(paste("\nTop", nwrd, "phrases by topic-over-null term lift:\n\n")) }
               Q0 <- col_sums(object$X)/sum(object$X)
               topwords <- c()
+              toplift <- c()
               for(k in tpk){
                 odds <- (log(object$theta[,k]) - log(Q0))[Q0!=0]
                 ko <- order(odds, decreasing=TRUE)
                 topk <- dimnames(object$theta)[[1]][Q0!=0][ko[1:nwrd]]
                 topwords <- cbind(topwords, topk)
+                toplift <- cbind(toplift, exp(sort(odds, decreasing=TRUE)[1:nwrd]))
                 if(verb){ cat(paste("[",k, "] '"))
                           cat(topk, sep="', '")
                           cat("'\n\n") }
               }
               topwords <- as.matrix(topwords)
-              dimnames(topwords)[[2]] <- paste(tpk)
+              toplift <- as.matrix(toplift)
+              dimnames(topwords)[[2]] <- dimnames(toplift)[[2]] <- paste("topic",tpk,sep="")
+              dimnames(toplift)[[1]] <- dimnames(toplift)[[1]] <- 1:nwrd
             }
-  else{ topwords <- NULL
+  else{ topwords <- toplift <- NULL
         if(verb){ cat("\n\n") } }
               
   if(!is.null(object$BF) && !is.null(object$dispersion) && verb)
@@ -114,7 +118,7 @@ summary.topics <- function(object, nwrd=5, tpk=NULL, verb=TRUE, ...){
       cat(paste("\nSelected the K =",object$K,"topic model\n\n"))
     }
 
-  invisible(topwords)
+  invisible(list(words=topwords, lift=toplift))
 }
 
 ## Colors for topic plotting

@@ -21,7 +21,7 @@ identify representative vocabulary for each topic.}
 \value{ The function prints usage percentages (i.e. \code{colMeans(omega)}) 
 and possible model selection results, along with the 
 top \code{nwrd} phrases by term-lift for each topic in \code{tpk}.  The 
-matrix of to \code{nwrd} phrases is returned invisibly. }
+matrix of top \code{nwrd} phrases and their associated lift is returned invisibly. }
 \references{
 Taddy (2011), \emph{Estimation of Topic Models}.
 }

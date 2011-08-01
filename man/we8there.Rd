@@ -30,12 +30,10 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 
 \examples{
 data(we8there)
+
 ## use bins to estimate with counts collapsed across equal ratings 1...5
-fit <- mnlm(we8thereCounts, we8thereRatings$Overall, bins=5) 
-summary(fit)
-par(mfrow=c(1,2))
-plot(fit, type="reduction", v=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
-plot(fit) # type = "response" default
+summary( fitwe8 <- mnlm(we8thereCounts, we8thereRatings$Overall, normalize=TRUE, bins=5) )
+plot(fitwe8, type="reduction", v=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
 
 ## A small topic model
 tpx <- topics(we8thereCounts, K=10, tol=0.1)

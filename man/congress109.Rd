@@ -43,19 +43,23 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 data(congress109)
 
 ## Inverse Regression Sentiment Modeling 
-fit <- mnlm(congress109Counts, congress109Ideology[,6:7], normalize=TRUE, bins=10)
+summary(fitRep <- mnlm(congress109Counts, congress109Ideology$repshare, normalize=TRUE, bins=10))
+plot(fitRep, type="reduction", pch=21, bg=c(4,3,2)[congress109Ideology$party])
+
+## Bivariate sentiment factors (roll-call vote common scores)
+fitCS <- mnlm(congress109Counts, congress109Ideology[,6:7], normalize=TRUE, bins=10)
 par(mfrow=c(1,2))
-plot(fit, type="reduction", v=congress109Ideology$repshare, xlab="Republican Vote-Share",
+plot(fitCS, type="reduction", v=congress109Ideology$repshare, xlab="Republican Vote-Share",
 	  covar=1, pch=21, bg=c(4,3,2)[congress109Ideology$party], main="1st common score")
-plot(fit, type="reduction", v=congress109Ideology$repshare, xlab="Republican Vote-Share", 
+plot(fitCS, type="reduction", v=congress109Ideology$repshare, xlab="Republican Vote-Share", 
 	  covar=2, pch=21, bg=c(4,3,2)[congress109Ideology$party], main="2nd common score")
 
 ## example usage of the predict method
-predict(fit, type="reduction", newdata=congress109Counts[c(68,388),])
-predict(fit, type="response", newdata=congress109Ideology[c(68,388),6:7])[,c(995,997)]
+predict(fitCS, type="reduction", newdata=congress109Counts[c(68,388),])
+predict(fitCS, type="response", newdata=congress109Ideology[c(68,388),6:7])[,c(995,997)]
 
 ## example usage of summary method
-summary(fit, y=congress109Ideology$repshare)
+summary(fitCS, y=congress109Ideology$repshare)
 
 ## A small topic model 
 par(mfrow=c(1,1))

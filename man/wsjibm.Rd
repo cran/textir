@@ -42,7 +42,7 @@ topwords <- array(dim=c(5,4,Y))
 shape=NULL
 for(i in 1:Y){ 
       annualtopics[[i]] <- topics(wsjibmCounts[year==levels(year)[i],], K=4, shape=shape)
-      topwords[,,i] <- summary(annualtopics[[i]], verb=FALSE)
+      topwords[,,i] <- summary(annualtopics[[i]], verb=FALSE)$words
       delta <- 100 # weight of the previous year in number of words observed per topic		
       shape <- annualtopics[[i]]$theta*delta }
 ## top 5 words by year in the first topic
