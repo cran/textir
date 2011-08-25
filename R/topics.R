@@ -1,16 +1,19 @@
 ##### Estimation for Topic Models ######
 
 ## intended main function; provides defaults and selects K via marginal lhd
-topics <- function(counts, K, shape=NULL, initopics=5, tol=0.01, admix=TRUE, grp=NULL,
+topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1, admix=TRUE, grp=NULL,
                    bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
-  ## tpxfit optional arguments are nef=TRUE, tmax=1000, wtol=10^(-4), qnewt=1, sqp=1, check=1
+  ## tpxfit optional arguments are tmax=10000, wtol=10^(-4), qnewt=10
 {
   ## check counts (can be an object from tm, slam, or a simple co-occurance matrix)
   if(class(counts)[1] == "TermDocumentMatrix"){ counts <- t(counts) }
   if(is.null(dimnames(counts)[[1]])){ dimnames(counts)[[1]] <- paste("doc",1:nrow(counts)) }
   if(is.null(dimnames(counts)[[2]])){ dimnames(counts)[[2]] <- paste("wrd",1:ncol(counts)) }
 
-  if(prod(row_sums(counts)>0) !=1){ stop("You've included empty documents.") }
+  empty <- row_sums(counts) == 0
+  if(sum(empty) != 0){
+    counts <- counts[!empty,]
+    cat(paste("Removed", sum(empty), "blank documents.\n")) }
   
   X <- as.simple_triplet_matrix(counts)
   p <- ncol(X) 
@@ -52,23 +55,26 @@ topics <- function(counts, K, shape=NULL, initopics=5, tol=0.01, admix=TRUE, grp
   invisible(out) }
 
 ## S3 method predict function
-predict.topics <- function(object, newcounts, grp=NULL, ...)
+predict.topics <- function(object, newcounts, grp=NULL, dispersion=FALSE, ...)
   ## tpxweights optional arguments and defauls are verb=FALSE, nef=TRUE, wtol=10^{-5}, tmax=1000
 {
   if(is.vector(newcounts)){ newcounts <- matrix(newcounts, nrow=1) }
   if(class(newcounts)[1] == "TermDocumentMatrix"){ newcounts <- t(newcounts) }
   X <- as.simple_triplet_matrix(newcounts)
   
-  if(class(object)!="topics"){ stop("object class must be `topics'.") }
+  if(!(class(object)%in%c("topics","matrix"))){ stop("object class must be `topics' or 'matrix'.") }
 
-  theta <- object$theta
-  if(nrow(theta) != ncol(X)){ stop("Dimension mismatch: nrow(theta) != ncol(X)") }
+  if(class(object)=="topics"){
+    theta <- object$theta
+    if(nrow(theta) != ncol(X)){ stop("Dimension mismatch: nrow(theta) != ncol(X)") }
+    if(!is.null(object$admix)){
+      if(!object$admix){
+        if(is.null(grp)){ grp <- rep(1, nrow(newcounts)) }
+        Q <- matrix(tpxMixQ(X, omega=object$omega, theta=theta, grp=grp)$lQ, ncol=ncol(theta))
+        return( (1:ncol(theta))[apply(Q,1,which.max)] ) } }
+  }
+  else{ theta <- object }
 
-  if(!object$admix){
-    if(is.null(grp)){ grp <- rep(1, nrow(newcounts)) }
-    Q <- matrix(tpxMixQ(X, omega=object$omega, theta=theta, grp=grp)$lQ, ncol=ncol(theta))
-    return( (1:ncol(theta))[apply(Q,1,which.max)] ) }
-  
   start <- tpxOmegaStart(X=X, theta=theta)
   
   ## re-order xvec in doc-blocks, and build indices
@@ -76,7 +82,14 @@ predict.topics <- function(object, newcounts, grp=NULL, ...)
   xv <- X$v[order(X$i)]
   wrd <- X$j[order(X$i)]-1
 
-  return(tpxweights(n=nrow(X), p=ncol(X), xv=xv, wrd=wrd, doc=doc, start=start, theta=theta, ...))  }
+  W <- tpxweights(n=nrow(X), p=ncol(X), xv=xv, wrd=wrd, doc=doc, start=start, theta=theta, ...)
+
+  if(dispersion){
+    R <- tpxresids(X=X, theta=theta, omega=W, grp=grp)
+    cat(paste("Predictive Dispersion =", round(R$d,3),"\n")) }
+  
+  return(W)
+}
 
 ## S3 method summary function
 summary.topics <- function(object, nwrd=5, tpk=NULL, verb=TRUE, ...){
@@ -85,14 +98,12 @@ summary.topics <- function(object, nwrd=5, tpk=NULL, verb=TRUE, ...){
   K <- object$K
   if(is.null(tpk)){ tpk <- 1:K }
   else if(prod(tpk %in% 1:K)!=1){ stop("requested tpk's are not in 1:K") }
-  
-  if(verb){ cat(paste("\nTopic % Usage: \n\n")) 
-            print(round( (col_means(object$omega)*100)[tpk], 1) ) }
-
-  if(nwrd>0){ if(verb){ cat(paste("\nTop", nwrd, "phrases by topic-over-null term lift:\n\n")) }
+ 
+  if(nwrd>0){ if(verb){ cat(paste("\nTop", nwrd, "phrases by topic-over-null term lift (and usage %):\n\n")) }
               Q0 <- col_sums(object$X)/sum(object$X)
               topwords <- c()
               toplift <- c()
+              usage <- round( (col_means(object$omega)*100), 1)
               for(k in tpk){
                 odds <- (log(object$theta[,k]) - log(Q0))[Q0!=0]
                 ko <- order(odds, decreasing=TRUE)
@@ -101,7 +112,7 @@ summary.topics <- function(object, nwrd=5, tpk=NULL, verb=TRUE, ...){
                 toplift <- cbind(toplift, exp(sort(odds, decreasing=TRUE)[1:nwrd]))
                 if(verb){ cat(paste("[",k, "] '"))
                           cat(topk, sep="', '")
-                          cat("'\n\n") }
+                          cat(paste("' (",usage[k],") \n",sep="")) }
               }
               topwords <- as.matrix(topwords)
               toplift <- as.matrix(toplift)
@@ -117,8 +128,10 @@ summary.topics <- function(object, nwrd=5, tpk=NULL, verb=TRUE, ...){
       print(round(rbind(lBF=object$BF,r2=object$dispersion),2))
       cat(paste("\nSelected the K =",object$K,"topic model\n\n"))
     }
+  else if(verb){ cat("\nDispersion =", round(object$dispersion,2), "\n\n") }
 
-  invisible(list(words=topwords, lift=toplift))
+  retobj <- data.frame(topic=rep(tpk, each=nwrd), phrase=c(topwords), lift=c(toplift))
+  invisible(retobj)
 }
 
 ## Colors for topic plotting

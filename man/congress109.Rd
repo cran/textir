@@ -63,7 +63,7 @@ summary(fitCS, y=congress109Ideology$repshare)
 
 ## A small topic model 
 par(mfrow=c(1,1))
-tpx <- topics(congress109Counts, K=15, tol=.1)
+tpx <- topics(congress109Counts, K=15, tol=10)
 plot(tpx, group=congress109Ideology$party=="R", col=c(4,2), labels=c("Dem","GOP"))
 summary(tpx)
 

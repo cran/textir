@@ -5,7 +5,7 @@ Estimation for Topic Models
 }
 \description{ MAP estimation of Topic models  }
 \usage{
-topics(counts, K, shape=NULL, initopics=5, tol=0.01, admix=TRUE, grp=NULL,
+topics(counts, K, shape=NULL, initopics=NULL, tol=0.1, admix=TRUE, grp=NULL,
 bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
 }
 \arguments{
@@ -15,13 +15,12 @@ bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
   \item{K}{The number of latent topics.  If \code{length(K)>1}, 
   \code{topics} will find the Bayes factor (vs a null single topic model) for each element and return parameter
   estimates for the highest probability K.}
-  \item{shape}{ Optional argument to specify the Dirichlet prior concentration parameter as \code{1+shape} for topic-phrase probabilities.  Defaults to \code{1/(K*ncol(counts))}.  For fixed single \code{K}, this can also be a \code{ncol(counts)} 
+  \item{shape}{ Optional argument to specify the Dirichlet prior concentration parameter as \code{shape} for topic-phrase probabilities.  Defaults to \code{1/(K*ncol(counts))}.  For fixed single \code{K}, this can also be a \code{ncol(counts)} 
   		by \code{K} matrix of unique shapes for each topic element.}
-  \item{initopics}{ Either an integer, or an optional start-location for \eqn{[\theta_1 ... \theta_K]}, the topic-phrase probabilities.  
-  		    In the latter case, dimensions must accord with the smallest element of \code{K}.  
-  		    If an integer, the initial estimates are built in \code{initopics} steps by incrementally adding topics. }
-  \item{tol}{ Convergence tolerance.  The optimization terminates when absolute change over a full parameter-set update
-  is less than \code{tol}.}
+  \item{initopics}{ Optional start-location for \eqn{[\theta_1 ... \theta_K]}, the topic-phrase probabilities.  
+  		    Dimensions must accord with the smallest element of \code{K}.  
+  		    If \code{NULL}, the initial estimates are built by incrementally adding topics. }
+  \item{tol}{ Convergence tolerance: optimization stops, conditional on some extra checks, when the posterior increase over a full paramater set update is less than \code{tol}.}
   \item{admix}{ An indicator for whether to fit the standard mixed-membership `admixture' topic model (default), 
                  or a simpler finite mixture of multinomials. }
   \item{grp}{ If \code{!admix}, an optional vector of group labels for each document, corresponding to blocked mixture proportions.  Interpreted as a \code{factor}. If \code{NULL}, every document is assumed to have the same prior mixture component probabilities. }  
@@ -48,10 +47,8 @@ for conditional \eqn{\Omega | \Theta} updates, to obtain MAP estimates for the t
 We also provide Bayes factor estimation, from marginal likelihood
 calculations based on a Laplace approximation around the converged MAP parameter estimates.  If  input \code{length(K)>1}, these
 Bayes factors are used for model selection. Full details are in Taddy (2011). }
-\note{ Estimates
-for each \eqn{\omega_i} are actually functions of the MAP (K-1)-dimensional 
-logit transformed natural exponential family parameter, while 
-\eqn{\Theta} is MAP in the original probability space.  }
+\note{ Estimates are actually functions of the MAP (K-1 or p-1)-dimensional 
+logit transformed natural exponential family parameters.  }
 \value{
  An \code{topics} object list with entries
 \item{K}{The number of latent topics estimated.  If input \code{length(K)>1}, 

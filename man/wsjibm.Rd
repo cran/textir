@@ -30,7 +30,7 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 data(wsjibm)
 ## fit a simple finite mixture model (not the usual mixed-membership admix)
 ## allow different topic-membership probabilities by gain/loss
-newstpx <- topics(wsjibmCounts, K=10, admix=FALSE, grp=wsjibmReturns$ROM>=0) 
+newstpx <- topics(wsjibmCounts, K=5, admix=FALSE, grp=wsjibmReturns$ROM>=0) 
 plot(newstpx,3, col=3, cex.lgdc=.6, ylab="gain")
 summary(newstpx, nwrd=10)
 
@@ -38,14 +38,15 @@ summary(newstpx, nwrd=10)
 year <- factor(1900 + as.POSIXlt(wsjibmReturns$DATE)$year)
 Y <- nlevels(year)
 annualtopics <- vector(length=Y, mode="list")
-topwords <- array(dim=c(5,4,Y))
+topwords <- c()
 shape=NULL
 for(i in 1:Y){ 
-      annualtopics[[i]] <- topics(wsjibmCounts[year==levels(year)[i],], K=4, shape=shape)
-      topwords[,,i] <- summary(annualtopics[[i]], verb=FALSE)$words
-      delta <- 100 # weight of the previous year in number of words observed per topic		
+      annualtopics[[i]] <- topics(wsjibmCounts[year==levels(year)[i],], K=5, shape=shape)
+      topwords <- cbind(topwords, as.character(summary(annualtopics[[i]], verb=FALSE)$phrase))
+      delta <- 10000 # weight of the previous year in number of words observed per topic		
       shape <- annualtopics[[i]]$theta*delta }
-## top 5 words by year in the first topic
-print(t(topwords[,1,]))	   	  	         
+## top 5 words by topic in past 4 years
+dimnames(topwords) <- list(topic=rep(1:5,each=5), year=levels(year))
+print(topwords[,Y - 3:0])	   	  	         
 
 }

@@ -1,3 +1,19 @@
+1.6-3 (24 Aug 2011)
+---
+Move back to L-based convergence with theta check
+Predict takes simple topic matrices and prints dispersion
+Remove some unused switches (sqp, nef, etc)
+Cleaner summary print-out and return object
+
+1.6-2 (10 Aug 2011)
+---
+Fix bug on non-reporting of dispersion
+New defaults on initialization
+Add hidden option for init tmax
+Allow for removal of empty docs
+Change to matrix return from summary
+Check for zeros in initheta
+
 1.6-1 (1 Aug 2011)
 ---
 Small update to we8there and congress data examples

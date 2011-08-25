@@ -36,7 +36,7 @@ summary( fitwe8 <- mnlm(we8thereCounts, we8thereRatings$Overall, normalize=TRUE,
 plot(fitwe8, type="reduction", v=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
 
 ## A small topic model
-tpx <- topics(we8thereCounts, K=10, tol=0.1)
+tpx <- topics(we8thereCounts, K=10, tol=10)
 par(mfrow=c(1,1))
 plot(tpx, group=we8thereRatings$Overall>3, col=c(2,3), labels=c("Bad","Good"))
 summary(tpx)
