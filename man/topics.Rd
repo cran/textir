@@ -5,8 +5,7 @@ Estimation for Topic Models
 }
 \description{ MAP estimation of Topic models  }
 \usage{
-topics(counts, K, shape=NULL, initopics=NULL, tol=0.1, admix=TRUE, grp=NULL,
-bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
+topics(counts, K, shape=NULL, initopics=NULL, tol=0.1, bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
 }
 \arguments{
   \item{counts}{
@@ -21,9 +20,6 @@ bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
   		    Dimensions must accord with the smallest element of \code{K}.  
   		    If \code{NULL}, the initial estimates are built by incrementally adding topics. }
   \item{tol}{ Convergence tolerance: optimization stops, conditional on some extra checks, when the posterior increase over a full paramater set update is less than \code{tol}.}
-  \item{admix}{ An indicator for whether to fit the standard mixed-membership `admixture' topic model (default), 
-                 or a simpler finite mixture of multinomials. }
-  \item{grp}{ If \code{!admix}, an optional vector of group labels for each document, corresponding to blocked mixture proportions.  Interpreted as a \code{factor}. If \code{NULL}, every document is assumed to have the same prior mixture component probabilities. }  
   \item{bf}{An indicator for whether or not to calculate the Bayes factor for univariate \code{K}.  
   If \code{length(K)>1}, this is ignored and Bayes factors are always calculated. }
   \item{kill}{For choosing from multiple \code{K} numbers of topics (evaluated in increasing order),
@@ -56,14 +52,14 @@ on output this is a single value corresponding to the model with the highest Bay
 \item{theta}{The \code{ncol{counts}} by \code{K} matrix of estimated topic-phrase probabilities.}
 \item{omega}{The \code{nrow{counts}} by \code{K} matrix of estimated document-topic weights. }
 \item{BF}{The log Bayes factor for each number of topics in the input \code{K}, against a null single topic model.}
-\item{dispersion}{The mean of squared positive residuals, an estimate of the multinomial dispersion parameter, 
-for each number of topics in the input \code{K}.}
-\item{residuals}{Standardized residuals (approximately \eqn{\sim N(0,1)}) \emph{for only nonzero count entries}. } 
+\item{D}{Residual dispersion: for each element of \code{K}, estimated dispersion parameter
+ (which should be near one for the multinomial), degrees of freedom, and p-value for a test of whether the true dispersion is \eqn{>1}.}
 \item{X}{The input count matrix, in \code{simple_triplet_matrix} format.}
-\item{admix}{The type of model.  Unchanged from input.}
-\item{grp}{Optional grouping under \code{!admix}.  Unchanged from input.}
 }
-\references{ Taddy (2011), \emph{Estimation of Topic Models}.}
+\references{
+Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+\url{http://arxiv.org/abs/1109.4518}
+}
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}
 }
@@ -75,26 +71,26 @@ for each number of topics in the input \code{K}.}
 
 ## Simulation Parameters
 K <- 10
-n <- 150
-p <- 250
+n <- 100
+p <- 100
 omega <- t(rdir(n, rep(1/K,K)))
 theta <- rdir(K, rep(1/p,p))
 
 ## Simulated counts
 Q <- omega\%*\%t(theta)
 counts <- matrix(ncol=p, nrow=n)
-totals <- rpois(n, 200)
+totals <- rpois(n, 100)
 for(i in 1:n){ counts[i,] <- rmultinom(1, size=totals[i], prob=Q[i,]) }
 
 ## Bayes Factor model selection (should choose K or nearby)
 summary(simselect <- topics(counts, K=K+c(-5:5)), nwrd=0)
 
 ## MAP fit for given K
-simfit <- topics(counts,  K=K)
+summary( simfit <- topics(counts,  K=K, verb=2), n=0 )
 
 ## Adjust for label switching and plot the fit (color by topic)
 toplab <- rep(0,K)
-for(k in 1:K){ toplab[k] <- which.min(colSums(abs(simfit$omega-omega[,k]))) }
+for(k in 1:K){ toplab[k] <- which.min(colSums(abs(simfit$theta-theta[,k]))) }
 par(mfrow=c(1,2))
 tpxcols <- matrix(rainbow(K), ncol=ncol(theta), byrow=TRUE)
 plot(theta,simfit$theta[,toplab], ylab="fitted values", pch=21, bg=tpxcols)
@@ -105,30 +101,5 @@ title("True vs Fitted Values (color by topic)", outer=TRUE, line=-2)
 par(mfrow=c(1,2))
 plot(simfit, lgd.K=2)
 plot(simfit, type="resid")
-
-## Same thing, but now with a simple mixture model 
-## (ie, not the mixed membership admixture model)
-
-## mixture simulation
-n <-5000
-theta <- rdir(K, rep(1/p,p))
-omega <- (1:K)/sum(1:K)
-grp <- apply(rmultinom(n, 1, omega),2,which.max)
-counts <- matrix(ncol=p, nrow=n)
-totals <- rpois(n,200)
-for(i in 1:n){ counts[i,] <- rmultinom(1, size=totals[i], prob=theta[,grp[i]]) }
-
-## fit the mixture model
-summary( mxt <- topics(counts, K=10, admix=FALSE), nwrd=0)
-
-## Adjust for label switching and plot the fit (color by topic)
-par(mfrow=c(1,1))
-toplab <- rep(0,K)
-for(k in 1:K){ toplab[k] <- which.min(colSums(abs(mxt$theta-theta[,k]))) }
-tpxcols <- matrix(rainbow(K), ncol=ncol(theta), byrow=TRUE)
-plot(theta, mxt$theta[,toplab], ylab="fitted values", pch=21, 
-     bg=tpxcols, main="True vs Fitted Values (color by topic)")
-
-
 
 }

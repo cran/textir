@@ -16,11 +16,11 @@ citEntry(entry = "Unpublished",
   title        = "Estimation for Topic Models",
   author       = personList(as.person("M. A. Taddy")),
   year         = "2011",
-  note          = "in prep",
+  note          = "http://arxiv.org/abs/1109.4518",
 
   textVersion  =
   paste("M. A. Taddy","(2011)",
         "Estimation of Topic Models,",
-        "in prep")
+        "http://arxiv.org/abs/1109.4518")
 
 )

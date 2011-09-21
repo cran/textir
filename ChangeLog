@@ -1,3 +1,16 @@
+1.7 (21 Sept 2011)
+---
+General release after testing and refining previous changes
+topic model reference paper is now publically available
+	
+1.6-4 (15 Sept 2011)
+---
+Added a NAMESPACE
+Estimate full-table dispersion; add chi2 p-values
+New formatting for residual information
+Remove from view all 'admix' related material
+Remove help for hidden functions
+
 1.6-3 (24 Aug 2011)
 ---
 Move back to L-based convergence with theta check

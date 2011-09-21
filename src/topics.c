@@ -242,6 +242,29 @@ void RcalcQ(int *n_in, int *p_in, int *K_in, int *doc, int *wrd,
   }
 }
 
+void RcalcTau(int *n_in, int *p_in, int *K_in,  double *m,
+	      double *omega, double *theta, double *tau, double *size ){
+
+  int n, p, K, i, j, h;
+  double q;
+
+  n = *n_in;
+  p = *p_in;
+  K = *K_in;
+
+  *tau = 0.0;
+  *size = 0;
+
+  for(j=0; j<p; j++){
+    for(i=0; i<n; i++){
+      q = 0.0;
+      for(h=0; h<K; h++) q += omega[h*n + i]*theta[h*p + j];
+      *tau += m[i]*q/(1-q);
+      if( (q*m[i]) > 0.01 ){  (*size)++; }
+    }
+  }
+}
+
 /* negative hessian in full NEF representation */
 void RnegHW(int *n_in, int *p_in, int *K_in, double *omeg, double *thet,
 	     int *doc, int *wrd, double *cnt, double *q, int *N, double *H){

@@ -1,0 +1,27 @@
+useDynLib(textir)
+
+import(slam)
+
+export(corr,
+       cubic,
+       freq,
+       mnlm,
+       normalize,
+       pls,
+       rdir,
+       sdev,
+       tfidf,
+       topics,
+       predict.topics)
+
+S3method(plot,mnlm)
+S3method(predict,mnlm)
+S3method(summary,mnlm)
+
+S3method(plot,pls)
+S3method(predict,pls)
+S3method(summary,pls)
+
+S3method(plot,topics)
+S3method(predict,topics)
+S3method(summary,topics)

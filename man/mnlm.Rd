@@ -1,6 +1,5 @@
 \name{mnlm}
 \alias{mnlm}
-\alias{mncheck}
 \title{
 Estimation for high-dimensional Multinomial Logistic Regression
 }
@@ -98,8 +97,6 @@ Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
 \url{http://arxiv.org/abs/1012.2098}
 
 }
-\note{ \code{mncheck} is an undocumented utility for discretizing \code{covars} as
-specified by the \code{bins} argument}
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}
 }

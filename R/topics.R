@@ -1,9 +1,9 @@
 ##### Estimation for Topic Models ######
 
 ## intended main function; provides defaults and selects K via marginal lhd
-topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1, admix=TRUE, grp=NULL,
+topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1, 
                    bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
-  ## tpxfit optional arguments are tmax=10000, wtol=10^(-4), qnewt=10
+  ## tpxselect defaults: tmax=10000, wtol=10^(-4), qnewt=10, grp=NULL, admix=TRUE, nonzero=FALSE, dcut=-10
 {
   ## check counts (can be an object from tm, slam, or a simple co-occurance matrix)
   if(class(counts)[1] == "TermDocumentMatrix"){ counts <- t(counts) }
@@ -24,18 +24,12 @@ topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1, admix=TRUE, g
   ## check the list of candidate K values
   if(prod(K>1)!=1){ stop(cat("use K values > 1\n")) }
   K <- sort(K)
-
-  ## check grp if mixture
-  if(!admix){
-    if(is.null(grp) || length(grp)!=nrow(X)){  grp <- rep(1,nrow(X)) }
-    else{ grp <- factor(grp) }
-  }
-  
+ 
   ## initialize
   initopics <- tpxinit(X[1:min(ceiling(nrow(X)*.05),100),], initopics, K[1], shape, verb)
   
   ## either search for marginal MAP K and return bayes factors, or just fit
-  tpx <- tpxSelect(X, K, bf, initopics, alpha=shape, tol, kill, verb, admix, grp, ...)
+  tpx <- tpxSelect(X, K, bf, initopics, alpha=shape, tol, kill, verb, ...)
   K <- tpx$K
   
   ## clean up and out
@@ -44,18 +38,15 @@ topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1, admix=TRUE, g
   ## Main parameters
   theta=matrix(tpx$theta[,worder], ncol=K, dimnames=list(phrase=dimnames(counts)[[2]], topic=paste(1:K)) )
   omega=matrix(tpx$omega[,worder], ncol=K, dimnames=list(document=NULL, topic=paste(1:K)) )
-  if(admix){ dimnames(omega)[[1]] <- dimnames(counts)[[1]] }
-  ## residuals (only for positive count entries)
-  rpos <- tpxresids(X, theta=tpx$theta, omega=tpx$omega, grp=grp)$r
+  if(nrow(omega)==nrow(counts)){ dimnames(omega)[[1]] <- dimnames(counts)[[1]] }
+  
   ## topic object
-  out <- list(K=K, theta=theta, omega=omega,
-              BF=tpx$BF, dispersion=tpx$D, residuals=rpos,
-              X=X, admix=admix, grp=grp)
+  out <- list(K=K, theta=theta, omega=omega, BF=tpx$BF, D=tpx$D, X=X)
   class(out) <- "topics"
   invisible(out) }
 
 ## S3 method predict function
-predict.topics <- function(object, newcounts, grp=NULL, dispersion=FALSE, ...)
+predict.topics <- function(object, newcounts, loglhd=FALSE, ...)
   ## tpxweights optional arguments and defauls are verb=FALSE, nef=TRUE, wtol=10^{-5}, tmax=1000
 {
   if(is.vector(newcounts)){ newcounts <- matrix(newcounts, nrow=1) }
@@ -67,11 +58,9 @@ predict.topics <- function(object, newcounts, grp=NULL, dispersion=FALSE, ...)
   if(class(object)=="topics"){
     theta <- object$theta
     if(nrow(theta) != ncol(X)){ stop("Dimension mismatch: nrow(theta) != ncol(X)") }
-    if(!is.null(object$admix)){
-      if(!object$admix){
-        if(is.null(grp)){ grp <- rep(1, nrow(newcounts)) }
-        Q <- matrix(tpxMixQ(X, omega=object$omega, theta=theta, grp=grp)$lQ, ncol=ncol(theta))
-        return( (1:ncol(theta))[apply(Q,1,which.max)] ) } }
+    if(nrow(object$X) != nrow(object$omega)) # simple mixture
+      { Q <- matrix(tpxMixQ(X, omega=object$omega, theta=theta, ...)$lQ, ncol=ncol(theta))
+        return( (1:ncol(theta))[apply(Q,1,which.max)] ) } 
   }
   else{ theta <- object }
 
@@ -84,11 +73,10 @@ predict.topics <- function(object, newcounts, grp=NULL, dispersion=FALSE, ...)
 
   W <- tpxweights(n=nrow(X), p=ncol(X), xv=xv, wrd=wrd, doc=doc, start=start, theta=theta, ...)
 
-  if(dispersion){
-    R <- tpxresids(X=X, theta=theta, omega=W, grp=grp)
-    cat(paste("Predictive Dispersion =", round(R$d,3),"\n")) }
-  
-  return(W)
+  if(loglhd){
+    L <- sum( X$v*log(tpxQ(theta=theta, omega=W, doc=X$i, wrd=X$j)) )
+    return(list(W=W, L=L)) }
+  else{ return(W) }
 }
 
 ## S3 method summary function
@@ -110,7 +98,7 @@ summary.topics <- function(object, nwrd=5, tpk=NULL, verb=TRUE, ...){
                 topk <- dimnames(object$theta)[[1]][Q0!=0][ko[1:nwrd]]
                 topwords <- cbind(topwords, topk)
                 toplift <- cbind(toplift, exp(sort(odds, decreasing=TRUE)[1:nwrd]))
-                if(verb){ cat(paste("[",k, "] '"))
+                if(verb){ cat(paste("[",k, "] '", sep=""))
                           cat(topk, sep="', '")
                           cat(paste("' (",usage[k],") \n",sep="")) }
               }
@@ -119,20 +107,25 @@ summary.topics <- function(object, nwrd=5, tpk=NULL, verb=TRUE, ...){
               dimnames(topwords)[[2]] <- dimnames(toplift)[[2]] <- paste("topic",tpk,sep="")
               dimnames(toplift)[[1]] <- dimnames(toplift)[[1]] <- 1:nwrd
             }
-  else{ topwords <- toplift <- NULL
-        if(verb){ cat("\n\n") } }
+  else{ topwords <- toplift <- NULL }
               
-  if(!is.null(object$BF) && !is.null(object$dispersion) && verb)
+  if(!is.null(object$BF) && !is.null(object$D) && verb)
     {
-      cat("Log Bayes factor and estimated dispersion, by number of topics:\n\n")
-      print(round(rbind(lBF=object$BF,r2=object$dispersion),2))
+      cat("\nLog Bayes factor and estimated dispersion, by number of topics:\n\n")
+      D <- rbind(logBF=object$BF,Disp=object$D[1,])
+      if(verb>1){ D <- rbind(D,p.val=object$D[2,]) }
+      print(round(D,2))
       cat(paste("\nSelected the K =",object$K,"topic model\n\n"))
     }
-  else if(verb){ cat("\nDispersion =", round(object$dispersion,2), "\n\n") }
+  else if(verb){
+    n <- nrow(object$K)
+    rho = pchisq(sum(object$r^2), df=length(object$r), lower.tail=FALSE)
+    cat("\nDispersion = ", round(object$D$dispersion,2) ,"\n\n",sep="") }
 
   retobj <- data.frame(topic=rep(tpk, each=nwrd), phrase=c(topwords), lift=c(toplift))
   invisible(retobj)
 }
+
 
 ## Colors for topic plotting
 TOPICOLS <- matrix(nrow=6,
@@ -150,10 +143,12 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
   if(type[1]=="resid"){
 
     if(is.null(col[1])){col <- 8}
-    if(is.null(xlab)){ xlab="Standardized residuals for non-zero counts" }
+    if(is.null(xlab)){ xlab="abs( adusted residuals )" }
     if(is.null(main)){ main="" }
-    
-    hist(x$resid, col=col, border=grey(.9),
+
+    resids <- tpxResids(x$X, theta=x$theta, omega=x$omega, ...)$r
+
+    hist(resids, col=col, border=grey(.9),
          xlab=xlab,
          main="", cex.lab=cex.lgdt, font.lab=3)
     
@@ -161,6 +156,7 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
   }
   
   n <- nrow(x$omega)
+  mmm <- n==nrow(x$X)
   if(n==1){
     if(is.null(main)){ main="" }
     if(is.null(xlab)){ xlab="topic" }
@@ -171,14 +167,14 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
   if(is.null(tpk)){ tpk <- 1:x$K }
   if(is.null(lgd.K)){ lgd.K <- max(.1*length(tpk),.75) }
   
-  if(is.null(group) || !x$admix){
+  if(is.null(group) || !mmm){
     ltop = .65*n
     lbot = .35*n
     
     if(is.null(col)){ col<-1 }
     tpcl <- c(0, TOPICOLS[1:6,col[1]%%5])
     W <- x$omega[,tpk]
-    if(x$admix){
+    if(mmm){
       brks <- seq(0,1,length=8)
       tplg <- c("w=0","w=1") }
     else{
@@ -206,7 +202,7 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
   old.mar <- par()$mar
   par(xpd=TRUE, mar=c(5.1,4.1,2.1,5*cex.rmar))
   if(is.null(ylab)){
-    if(x$admix){ ylab="Document" }
+    if(nrow(x$X)==nrow(x$omega)){ ylab="Document" }
     else{ ylab="group" } }
   if(is.null(xlab)){ xlab="Topic" }
   if(is.null(main)){ main="Topic-Loading Weights" }
@@ -215,8 +211,10 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
   image(y=1:n, x=1:length(tpk), t(W), ylab=ylab, xlab=xlab,
         main=main, col=tpcl, font.lab=3, xaxt="n", yaxt="n", breaks=brks, ...)
   axis(side=1, at=1:length(tpk), labels=tpk, tick=FALSE, line=-.5)
-  if(x$admix){ axis(2) }
-  else{ axis(side=2, at=1:n, labels=levels(as.factor(x$grp))) }
+
+  if(!mmm){ axis(side=2, at=1:n) }
+  else{axis(2)}
+  
   points(rep(xlg,length(tpcl)), seq(lbot,ltop,length=length(tpcl)), col=tpcl, pch=15, cex=3*cex.lgdc)
   text(rep(xlg,2), y=c(lbot-.08*n, ltop+.08*n), tplg, cex=cex.lgdt)
   if(!is.null(labels)){ text(rep(xlg,2), y=c(lbot-.14*n, ltop+.14*n), labels, font=3, cex=cex.lgdt) }

@@ -15,6 +15,9 @@ Matt Taddy \email{taddy@chicagobooth.edu}
 Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
 \url{http://arxiv.org/abs/1012.2098}
 
+Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+\url{http://arxiv.org/abs/1109.4518}
+
 }
 \seealso{pls, mnlm}
 

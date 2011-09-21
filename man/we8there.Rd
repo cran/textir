@@ -20,6 +20,10 @@ Maua, D.D. and Cozman, F.G. (2009), \emph{Representing and classifying user revi
 
 Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
 \url{http://arxiv.org/abs/1012.2098}
+
+Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+\url{http://arxiv.org/abs/1109.4518}
+
 }
 
 \author{ 
@@ -35,8 +39,8 @@ data(we8there)
 summary( fitwe8 <- mnlm(we8thereCounts, we8thereRatings$Overall, normalize=TRUE, bins=5) )
 plot(fitwe8, type="reduction", v=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
 
-## A small topic model
-tpx <- topics(we8thereCounts, K=10, tol=10)
+## Fit a topic model (use lower tol for true convergence)
+tpx <- topics(we8thereCounts, K=20, tol=10)
 par(mfrow=c(1,1))
 plot(tpx, group=we8thereRatings$Overall>3, col=c(2,3), labels=c("Bad","Good"))
 summary(tpx)

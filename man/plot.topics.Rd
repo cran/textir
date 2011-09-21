@@ -1,6 +1,5 @@
 \name{plot.topics}
 \alias{plot.topics}
-\alias{TOPICOLS}
 \title{
 topic plots
 }
@@ -15,7 +14,7 @@ cex.lgdc = 1, cex.lgdt = 1, cex.rmar= 1, ... )
 \item{type}{If "weight", the default, provide an image plot of document-topic weights. 
 	    If "resid", just show a simple histogram of standardized residuals for the positive count entries. }
 \item{group}{ Optional \code{logical} vector containing membership in some group for each document;
-this will be used to color the topic-weight shadings.  Does not apply if \code{!x$admix}.
+this will be used to color the topic-weight shadings.  
 See the \code{textir} dataset examples, which color by good reviews for the we8there data or by republicans in congress109.}
 \item{labels}{ Optional length-two \code{character} vector of labels for the membership specified in \code{groups}.
 \code{labels[1]} corresponds to \code{group=FALSE} and \code{labels[2]} to \code{group=TRUE}. }
@@ -36,9 +35,9 @@ outside of the plot region at which the legend is centered. }
 
 \value{ A fabulous plot. }
 \references{
-Taddy (2011), \emph{Estimation of Topic Models}.
+Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+\url{http://arxiv.org/abs/1109.4518}
 }
-\note{\code{TOPICOLS} is an internal matrix of colors used for shading topic loadings.}
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}
 }

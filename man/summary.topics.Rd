@@ -18,12 +18,14 @@ topic summary
 \eqn{\theta_{kj}/q_{j}}, where \eqn{q_j} is the null-model probability estimate
 \eqn{\sum_i x_{ij} / \sum_{i} m_i }.  This ordering of term relevance can be used to 
 identify representative vocabulary for each topic.}
-\value{ The function prints usage percentages (i.e. \code{colMeans(omega)}) 
-and possible model selection results, along with the 
+\value{ The function prints available model selection results (log Bayes factors, 
+fitted dispersion, and p-value from a test for dispersion \eqn{>1}) along with 
+usage percentages (i.e. \code{colMeans(omega)}) and the
 top \code{nwrd} phrases by term-lift for each topic in \code{tpk}.  The 
 matrix of top \code{nwrd} phrases and their associated lift is returned invisibly. }
 \references{
-Taddy (2011), \emph{Estimation of Topic Models}.
+Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+\url{http://arxiv.org/abs/1109.4518}
 }
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}

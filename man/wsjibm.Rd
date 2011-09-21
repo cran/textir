@@ -28,20 +28,17 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 
 \examples{
 data(wsjibm)
-## fit a simple finite mixture model (not the usual mixed-membership admix)
-## allow different topic-membership probabilities by gain/loss
-newstpx <- topics(wsjibmCounts, K=5, admix=FALSE, grp=wsjibmReturns$ROM>=0) 
-plot(newstpx,3, col=3, cex.lgdc=.6, ylab="gain")
-summary(newstpx, nwrd=10)
+## fit a simple topic model
+summary( newstpx <- topics(wsjibmCounts, K=10), nwrd=10 )
 
-## fit admixture topics over years, using prior shape to allow them to change in time
+## fit topics over years, using prior shape to allow them to change in time
 year <- factor(1900 + as.POSIXlt(wsjibmReturns$DATE)$year)
 Y <- nlevels(year)
 annualtopics <- vector(length=Y, mode="list")
 topwords <- c()
 shape=NULL
 for(i in 1:Y){ 
-      annualtopics[[i]] <- topics(wsjibmCounts[year==levels(year)[i],], K=5, shape=shape)
+      annualtopics[[i]] <- topics(wsjibmCounts[year==levels(year)[i],], K=5, shape=shape, ord=FALSE)
       topwords <- cbind(topwords, as.character(summary(annualtopics[[i]], verb=FALSE)$phrase))
       delta <- 10000 # weight of the previous year in number of words observed per topic		
       shape <- annualtopics[[i]]$theta*delta }

@@ -31,6 +31,10 @@ Gentzkow, M. and J. Shapiro (2010), \emph{What drives media slant? Evidence from
 
 Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
 \url{http://arxiv.org/abs/1012.2098}
+
+Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+\url{http://arxiv.org/abs/1109.4518}
+
 }
 
 \author{ 
@@ -61,9 +65,9 @@ predict(fitCS, type="response", newdata=congress109Ideology[c(68,388),6:7])[,c(9
 ## example usage of summary method
 summary(fitCS, y=congress109Ideology$repshare)
 
-## A small topic model 
+## Fit topic model (use lower tol for true convergence)
 par(mfrow=c(1,1))
-tpx <- topics(congress109Counts, K=15, tol=10)
+tpx <- topics(congress109Counts, K=12, tol=10)
 plot(tpx, group=congress109Ideology$party=="R", col=c(4,2), labels=c("Dem","GOP"))
 summary(tpx)
 
