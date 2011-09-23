@@ -143,7 +143,7 @@ tpxfit <- function(X, theta, alpha, tol, verb,
   doc <- c(0,cumsum(as.double(table(factor(X$i, levels=c(1:nrow(X)))))))
   
   ## Initialize
-  omega <- tpxweights(n=n, p=p, xv=xvo, wrd=wrd, doc=doc, start=tpxOmegaStart(X,theta), theta=theta)
+  omega <- tpxweights(n=n, p=p, xvo=xvo, wrd=wrd, doc=doc, start=tpxOmegaStart(X,theta), theta=theta)
   if(!admix){ omega <- matrix(apply(omega,2, function(w) tapply(w,grp,mean)), ncol=K) }
 
   ## tracking
@@ -175,9 +175,14 @@ tpxfit <- function(X, theta, alpha, tol, verb,
     move <- qn$move
     Y <- qn$Y
     
+    if(qn$L < L){  # happens on bad Wfit, so fully reverse
+      move <- tpxEM(X=X, m=m, theta=theta, omega=omega, alpha=alpha, admix=admix, grp=grp)
+      qn$L <-  tpxlpost(X=X, theta=move$theta, omega=move$omega, alpha=alpha, admix=admix, grp=grp) }
+
     ## calculate dif
     dif <- qn$L-L
     L <- qn$L
+    
         
     ## check convergence
     if(abs(dif) < tol){
@@ -282,15 +287,14 @@ tpxQN <- function(move, Y, X, alpha, verb, admix, grp, doqn)
   ## check for a likelihood improvement
   Lqnup <- try(tpxlpost(X=X, theta=qnup$theta, omega=qnup$omega,
                         alpha=alpha, admix=admix, grp=grp), silent=TRUE)
+  
   if(inherits(Lqnup, "try-error")){
     if(verb>10){ cat("(QN: try error) ") }
-    L <- tpxlpost(X=X, theta=move$theta, omega=move$omega,
-                  alpha=alpha, admix=admix, grp=grp)
     return(list(Y=Y, move=move, L=L)) }
-    if(verb>10){ cat(paste("(QN diff ", round(Lqnup-L,3), ")\n", sep="")) }      
+  
+  if(verb>10){ cat(paste("(QN diff ", round(Lqnup-L,3), ")\n", sep="")) }
+  
   if(Lqnup < L){
-    L <- tpxlpost(X=X, theta=move$theta, omega=move$omega,
-                  alpha=alpha, admix=admix, grp=grp)
     return(list(Y=Y, move=move, L=L)) }
   else{
     L <- Lqnup
@@ -355,7 +359,7 @@ tpxResids <- function(X, theta, omega, grp=NULL, nonzero=TRUE)
   phat <- sum(col_sums(X)>0)
   d <- n*(K-1) + K*( phat-1 )
 
-  if(is.null(grp)){
+  if(nrow(omega) == nrow(X)){
     qhat <- tpxQ(theta=theta, omega=omega, doc=X$i, wrd=X$j)
     xhat <- qhat*m[X$i]
   } else{
@@ -363,7 +367,7 @@ tpxResids <- function(X, theta, omega, grp=NULL, nonzero=TRUE)
     qhat <- row_sums(q[X$i,]*theta[X$j,])
     xhat <- qhat*m[X$i] }
 
-  if(nonzero){
+  if(nonzero || nrow(omega) < nrow(X)){
     ## Calculations based on nonzero counts
     ## conditional adjusted residuals
     e <- X$v^2 - 2*(X$v*xhat - xhat^2)
@@ -385,10 +389,11 @@ tpxResids <- function(X, theta, omega, grp=NULL, nonzero=TRUE)
                  theta = as.double(theta),
                  tau = double(1), size=double(1),
                  PACKAGE="textir" )
-    tau <- fulltable$tau
+    tau <- fulltable$tau 
     R <- sum(e/s) + tau
     df <-  fulltable$size - phat  - d
-    r <- sqrt(e/s + tau)
+    r <- suppressWarnings(sqrt(e/s + tau))
+    r[is.nan(r)] <- 0 ## should not happen, but can theoretically
   }
   
   ## collect and output

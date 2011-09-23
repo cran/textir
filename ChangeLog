@@ -1,8 +1,13 @@
+1.7-1 (23 Sept 2011)
+---
+Fix negative dispersion under mixture model
+Add check for negative W update
+
 1.7 (21 Sept 2011)
 ---
 General release after testing and refining previous changes
 topic model reference paper is now publically available
-	
+
 1.6-4 (15 Sept 2011)
 ---
 Added a NAMESPACE

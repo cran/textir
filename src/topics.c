@@ -276,7 +276,6 @@ void RnegHW(int *n_in, int *p_in, int *K_in, double *omeg, double *thet,
   K = *K_in;
   K2 = K*K;
   double ttbyq2;
-  double Kdub = (double) K;
 
   zero_dvec(H, n*K2);
 

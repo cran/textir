@@ -3,7 +3,7 @@
 ## intended main function; provides defaults and selects K via marginal lhd
 topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1, 
                    bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
-  ## tpxselect defaults: tmax=10000, wtol=10^(-4), qnewt=10, grp=NULL, admix=TRUE, nonzero=FALSE, dcut=-10
+  ## tpxselect defaults: tmax=10000, wtol=10^(-4), qnewt=100, grp=NULL, admix=TRUE, nonzero=FALSE, dcut=-10
 {
   ## check counts (can be an object from tm, slam, or a simple co-occurance matrix)
   if(class(counts)[1] == "TermDocumentMatrix"){ counts <- t(counts) }
@@ -68,10 +68,10 @@ predict.topics <- function(object, newcounts, loglhd=FALSE, ...)
   
   ## re-order xvec in doc-blocks, and build indices
   doc <- c(0,cumsum(as.double(table(factor(X$i, levels=c(1:nrow(X)))))))
-  xv <- X$v[order(X$i)]
+  xvo <- X$v[order(X$i)]
   wrd <- X$j[order(X$i)]-1
 
-  W <- tpxweights(n=nrow(X), p=ncol(X), xv=xv, wrd=wrd, doc=doc, start=start, theta=theta, ...)
+  W <- tpxweights(n=nrow(X), p=ncol(X), xvo=xvo, wrd=wrd, doc=doc, start=start, theta=theta, ...)
 
   if(loglhd){
     L <- sum( X$v*log(tpxQ(theta=theta, omega=W, doc=X$i, wrd=X$j)) )
