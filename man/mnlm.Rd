@@ -7,7 +7,7 @@ Estimation for high-dimensional Multinomial Logistic Regression
 MAP estimation of multinomial logistic regression models.  
   }
 \usage{
-mnlm(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL, 
+mnlm(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=0.2), start=NULL, 
                   tol=0.1, tmax=1000, delta=1, dmin=0, bins=0, verb=FALSE)
 }
 \arguments{
@@ -24,12 +24,17 @@ mnlm(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
     Whether or not to normalize the covariate matrix to have mean zero and variance one.  
 }
 \item{penalty}{
-  Either a single fixed value, or a vector of length 2 giving the gamma hyperprior prior shape and rate parameters.
+  Either a single fixed value, or a vector of length 2 giving the gamma hyperprior
+ shape and rate parameters (for expected penalty of \code{shape/rate}).
   Here, the penalty (\eqn{\lambda>0}) is a 
   scale parameter for the Laplace prior on each non-intercept 
   regression coefficient, parametrized
    \deqn{p(b) =  (\lambda/2)exp[-\lambda|b|].}  
-  Refer to Taddy (2010) for details.
+  Refer to Taddy (2010) for details.  Alternatively, \code{penalty} 
+  can be a list with with individual penalties
+  (single value or length-2 prior vector) for each column of the 
+  design matrix (i.e. including the intercept).  Using this list specification, 
+  you can also fix a column at the \code{start} values by giving a penalty of -1 for that coefficient.
 }
 \item{start}{
     An initial guess for the full \code{ncol(counts)} by \code{ncol(covars)+1}

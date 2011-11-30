@@ -1,3 +1,4 @@
+// need to make sure both lams are k indexed (not k-1)
 #include <stdlib.h>
 #include <assert.h>
 #include <Rmath.h>
@@ -8,8 +9,8 @@
 
 /* global variables */
 
-int n, p, d, N, maplam;
-double Bsum, nregpar;
+int n, p, d, N;
+double nregpar;
 
 int dirty = 0;
 int *m = NULL;
@@ -23,20 +24,24 @@ double **B = NULL;
 double **G = NULL;
 double **H = NULL;
 double **D = NULL;
-double *lam = NULL;
+double **lam = NULL;
+int *maplam = NULL;
 
 /* un-normalized negative log posterior */
 
-double neglogpost(){
+double neglogpost(){  
   
   double L = 0.0;
   int i, j, k;
   
   for(i=0; i<N; i++) L += -X[i]*(eta[xi[1][i]][xi[0][i]] - log(denom[xi[0][i]]));
 
-  if(maplam) // L += (nregpar + lam[0] -1.0)*Bsum/(lam[1]+Bsum); // joint lambda
-  for(j=0;j<=p;j++) for(k=1; k<d; k++) L += lam[0]*fabs(B[k][j])/(lam[1]+fabs(B[k][j]));
-  else L += Bsum*lam[0];
+  for(k=1; k<d; k++){ 
+    if(maplam[k]==1) 
+      for(j=0;j<=p;j++) L += lam[k][0]*fabs(B[k][j])/(lam[k][1]+fabs(B[k][j]));
+    else if(maplam[k]==0) 
+      for(j=0;j<=p;j++) L += lam[k][0]*fabs(B[k][j]);
+  }
 
   return L;
 }
@@ -52,7 +57,7 @@ void residuals(double *xhat, double *r){
 }
 
 
-/* update eta, Bsum, B, and return the new objective value */
+/* update eta + B, and return the new objective value */
 
 void update(int j, int k, double bnew)
 {
@@ -65,7 +70,6 @@ void update(int j, int k, double bnew)
       denom[i] += exp(eta[j][i]);
     }
 
-  if(k!=0) Bsum += fabs(bnew) - fabs(B[k][j]);
   B[k][j] = bnew;
 }
 
@@ -98,12 +102,11 @@ void calcH(int j, int k){
 
 double bound(double z, int j, int k, double grad) 
 {
-  double c;
-  if(maplam)
-    c = lam[0]*fabs(z)/(lam[1] + fabs(z));
-    // joint lambda
-    // c = (lam[0] + nregpar - 1.0)*(Bsum - fabs(B[k][j]) + fabs(z))/(lam[1] + Bsum - fabs(B[k][j]) + fabs(z));
-  else c = lam[0]*(Bsum - fabs(B[k][j]) + fabs(z));
+  double c = 0.0;
+  if(maplam[k]==1)
+    c = lam[k][0]*fabs(z)/(lam[k][1] + fabs(z));
+  else if(maplam[k]==0) 
+    c = lam[k][0]*fabs(z);
 
   return grad*(z-B[k][j]) + 0.5*(z-B[k][j])*(z-B[k][j])*H[k][j] + c;
 }
@@ -112,15 +115,12 @@ double bound(double z, int j, int k, double grad)
 
 double findroot(int j, int k, double grad, double sgn)
 {
-  assert(maplam);
+  assert(maplam[k]>=0);
 
   double a, b, c, s, r, ghb;
   
-  s = lam[0]*lam[1];
-  r = lam[1];
-  // joint lambda
-  // s = (lam[0] + nregpar - 1.0)*lam[1]; 
-  // r = lam[1] + Bsum - fabs(B[k][j]);
+  s = lam[k][0]*lam[k][1];
+  r = lam[k][1];
 
   ghb = grad/H[k][j]-B[k][j];
     
@@ -152,24 +152,24 @@ double findroot(int j, int k, double grad, double sgn)
 
 /* The gradient descent move for given direction */ 
 
-double Bmove(int j, int k, double grad, double sgn, int pen)
+double Bmove(int j, int k, double grad, double sgn)
 {
   double dbet;
-
+  assert(maplam[k] >= 0);
   if(H[k][j] == 0.0) return -B[k][j]; // happens only if you have all zero predictors
 
-  if(!pen){ // unpenalized (intercept) parameters
+  if(lam[k][0]==0){ // unpenalized (e.g. intercept) parameters
     dbet = -grad/H[k][j]; 
   }
-  else if(!maplam){ // update with fixed lambda 
+  else if(maplam[k]==0){ // update with fixed lambda 
     if(sgn != 0.0)
-      { dbet = -(grad+sgn*lam[0])/H[k][j]; 
+      { dbet = -(grad+sgn*lam[k][0])/H[k][j]; 
 	if(sgn != sign(B[k][j]+dbet)) dbet = -B[k][j]; }
     else{ // check both sides
       double obj = bound(B[k][j], j, k, grad);
-      dbet =  -(grad + lam[0])/H[k][j];
+      dbet =  -(grad + lam[k][0])/H[k][j];
       if( !(bound(B[k][j] + dbet, j, k, grad) < obj) )
-	{ dbet = -(grad - lam[0])/H[k][j];
+	{ dbet = -(grad - lam[k][0])/H[k][j];
 	  if( !(bound(B[k][j] + dbet, j, k, grad) < obj) ) dbet = 0.0; } }
   }
   else{ // lambda/beta update
@@ -202,8 +202,8 @@ void mnlm_cleanup(){
   if(G){ delete_mat(G); G = NULL; }
   if(H){ delete_mat(H); H = NULL; }
   if(D){ delete_mat(D); D = NULL; }
-  if(maplam) 
-    if(lam){ free(lam); lam = NULL; }
+  if(maplam){ free(maplam); maplam = NULL; }
+  if(lam){ delete_mat(lam); lam = NULL; }
 }
 
 /* 
@@ -246,13 +246,10 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   D = new_mat(p+1, d);
   for(j=0; j<=p; j++) for(k=0; k<d; k++) D[k][j] = delta[0]; 
 
-  maplam = *maplam_in;
-  if(maplam) lam = new_dup_dvec(lam_in, 2); 
-  else  lam = new_dup_dvec(lam_in, 1); 
-
+  maplam = new_dup_ivec(maplam_in, d);
+  lam = new_mat_fromv(2, d, lam_in);
+  
   B = new_mat_fromv(p+1, d, beta_vec);
-  Bsum = 0.0;
-  for(j=1; j<=p; j++) for(k=1; k<d; k++) Bsum += fabs(B[k][j]);
 
   eta = new_zero_mat(n, p+1);
   la_dgemm( 0, 1, n, d, p+1, d, n, p+1, *V, *B, *eta, 1.0, 0.0 ); 
@@ -281,8 +278,11 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   /* introductory print statements */
   if(verb)
     { myprintf(stdout, "*** Logistic Regression with a %d x %d coefficient matrix ***\n", p, d);
-      if(maplam) myprintf(stdout, "Joint MAP penalty estimation under a gamma(%g,%g) prior\n", lam[0], lam[1]);
-      else myprintf(stdout, "Estiamtion with L1 penalty of %g\n\n", lam[0]);
+      for(k=0; k<d; k++){
+	if(maplam[k] == 1) myprintf(stdout, "V[%d]: Joint MAP penalty estimation under a gamma(%g,%g) prior\n", k, lam[k][0], lam[k][1]);
+	else if (maplam[k] == 0) myprintf(stdout, "V[%d]: Estimation with L1 penalty of %g\n", k, lam[k][0]);
+	else if (maplam[k] == -1) myprintf(stdout, "V[%d]: Fixed coefficients\n", k);
+      }
       myprintf(stdout, "Objective L initialized at %g\n", Lout[0]); }
   
   /* optimize until objective stops improving or t>tmax */
@@ -292,14 +292,15 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
     // loop through coefficient
     for(j=1; j<=p; j++)
       for(k=0; k<d; k++)
-	{ if(B[k][j] != 0.0 || dozero || k==0 || t < 3){
+	if(maplam[k]>=0){ 
+	  if(B[k][j] != 0.0 || dozero || lam[k][0]==0 || t < 3){
 	    // gradient
 	    grad = G[k][j];
 	    for(i=0; i<n; i++) grad += ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i];
 	    // curvature 
 	    calcH(j, k); 
 	    // conditional newton update
-	    bnew = B[k][j] + Bmove(j, k, grad, sign(B[k][j]), k>0);
+	    bnew = B[k][j] + Bmove(j, k, grad, sign(B[k][j]));
 	    // check and update dependencies
 	    if(bnew != B[k][j])
 	      { D[k][j] = fmax(*dmin,fmax(0.5*D[k][j], 2.0*fabs(B[k][j] - bnew)));
@@ -323,6 +324,9 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
 		 t, Lout[t], diff, 100*((double) numzero)/nregpar);
 	if(t==tmax) myprintf(stdout, "Terminating optimization; exhausted max number of iterations.\n"); }
    
+    if(diff < 0.0){
+      myprintf(stdout, "WARNING: non-monotonic convergence. \nThis means you have a non-concave posterior, leading to an unstable MAP. \nTry increasing the hyperprior rate on your penalty or using fixed penalties.\n"); }
+
     // check for active set update
     if(dozero == 1) dozero = 0;
     else if(diff < tol)

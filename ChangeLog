@@ -1,3 +1,10 @@
+1.7-2 (30 Nov 2011)
+---
+Allow for unique penalties on each covariate
+Allow for fixing some covariates
+Warn on negative diff in mnlm
+Print the bin scheme in mnlm
+
 1.7-1 (23 Sept 2011)
 ---
 Fix negative dispersion under mixture model

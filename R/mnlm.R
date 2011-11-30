@@ -1,7 +1,7 @@
 ##### Estimation for Regularized Logit Multinomial Regression  ######
 
 ## Main function; most happens in .C 
-mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
+mnlm <- function(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=.2), start=NULL,
                  tol=0.1, tmax=1000, delta=1, dmin=0, bins=0, verb=FALSE)
 {
   
@@ -30,7 +30,7 @@ mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
     }
   
   ## check and possibly bin observations for fast inference
-  binned <- mncheck(counts, covars, bins)
+  binned <- mncheck(counts, covars, bins, verb)
   X <- binned$X # adds a null column onto X if ncol(X) > 2
   V <- cbind(1, binned$V)
   
@@ -58,13 +58,41 @@ mnlm <- function(counts, covars, normalize=FALSE, penalty=c(1,0.2), start=NULL,
   }
   else{ if(nrow(start) != p || ncol(start) != d) stop("bad starting coefficient matrix") }
   coef <- rbind(rep(0,d), start)
-  
-  if(length(penalty)==1){ maplam <- 0 }
-  else
-    { maplam = 1
-      if(length(penalty) != 2 || prod(penalty>0) == 0){ stop("bad lambda argument") } }
-  lampar <- penalty
 
+  ## build the penalties
+  if(is.list(penalty)){
+    if(length(penalty) != d){ stop("bad penalty argument") }
+    maplam = c()
+    lampar = c()
+    for(i in 1:d){
+      if(length(penalty[[i]]) == 1){
+        if(penalty[[i]] < 0){
+          maplam = c(maplam,-1)
+          lampar = c(lampar, c(0,0))
+        }
+        else{
+          maplam = c(maplam,0)
+          lampar = c(lampar, c(penalty[[i]], 0))
+        }
+      }
+      else if(length(penalty[[i]]) == 2){
+        maplam = c(maplam,1)
+        lampar = c(lampar, penalty[[i]])
+      }
+      else{ stop("bad lambda argument within your penalty list") }
+    }
+  }
+  else{
+    if(length(penalty)==1){
+      maplam <- rep(0,d)
+      lampar <- c(c(0,0),rep(c(penalty,0),d-1)) }
+    else if(length(penalty)==2){ 
+      maplam = c(0,rep(1,d-1))
+      lampar = c(c(0,0), rep(penalty,d-1))
+    }
+    else{ stop("bad lambda argument: length(penalty) > 2") }
+  }
+  
   map <- .C("Rmnlogit",
             n = as.integer(n),
             p = as.integer(p),
@@ -298,7 +326,7 @@ cubic <- function(a, b, c, quiet=FALSE, plot=FALSE)
 
 #######  Undocumented "mnlm"-related utility functions #########
 
-mncheck <- function(X, V, bins){
+mncheck <- function(X, V, bins, verb){
 
   if(bins<=1){
     if(ncol(X)>2){ X <- cbind(as.vector(0.001*row_sums(X)/0.999), X) }
@@ -308,7 +336,7 @@ mncheck <- function(X, V, bins){
   R <- apply(V, 2, range)
   B <- mapply(seq, from=R[1,], to=R[2,], MoreArgs=list(length=bins))
   O <- apply(V, 2, order)-1
-
+  
   out  <- .C("Rbin",
              n = as.integer(nrow(V)),
              d = as.integer(ncol(V)),
@@ -329,6 +357,11 @@ mncheck <- function(X, V, bins){
   ij <- matrix(as.numeric(unlist(strsplit(names(vals), split="\\."))), ncol=2, byrow=TRUE)
   Xs <- simple_triplet_matrix(i=ij[,1], j=ij[,2], v=vals, dimnames=list(I=dimnames(Vm)[[1]], cat=dimnames(X)[[2]]))
   if(ncol(Xs)>2){ Xs <- cbind(as.vector(0.001*row_sums(Xs)/0.999),Xs) }
+
+  if(verb){
+    cat("\nResponse Bins: \n")
+    print(Vm)
+    cat("\n") }
   
   return( list(X=Xs, V=Vm, I=as.numeric(I)) )
 
