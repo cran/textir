@@ -10,7 +10,6 @@
 /* global variables */
 
 int n, p, d, N;
-double nregpar;
 
 int dirty = 0;
 int *m = NULL;
@@ -234,7 +233,6 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   n = *n_in;
   p = *p_in;
   d = *d_in;  
-  nregpar = ((double) (d*p-p));
 
   m = new_dup_ivec(m_in, n); 
   N = *N_in;
@@ -272,7 +270,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   diff = tol*100.0;
   t = 0;
   int dozero = 1; 
-  int numzero;
+  double numzero, nregpar;
   double bnew;
 
   /* introductory print statements */
@@ -287,7 +285,8 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   
   /* optimize until objective stops improving or t>tmax */
   while(t<tmax && diff > tol){
-    numzero = 0;
+    numzero = 0.0;
+    nregpar = 0.0;
 
     // loop through coefficient
     for(j=1; j<=p; j++)
@@ -307,7 +306,9 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
 		update(j, k,  bnew); assert(D[k][j] > 0.0); }
 	  }
 	  // sum the zeros and check for escape from R
-	  if(B[k][j] == 0.0) numzero++; 
+	  if(k>0)
+	    { nregpar++;
+	      if(B[k][j] == 0.0) numzero++; }
 	  itime = my_r_process_events(itime); }
     
     // iterate
@@ -321,7 +322,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
       myprintf(stdout, "L is NaN!  Try a larger `penalty' or use normalize=TRUE. \n"); }
     else if(verb)
       { myprintf(stdout, "t = %d: L = %g (diff of %g) with %g%% zero loadings.\n", 
-		 t, Lout[t], diff, 100*((double) numzero)/nregpar);
+		 t, Lout[t], diff, 100.0*(numzero/nregpar));
 	if(t==tmax) myprintf(stdout, "Terminating optimization; exhausted max number of iterations.\n"); }
    
     if(diff < 0.0){

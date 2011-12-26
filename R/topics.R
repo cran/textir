@@ -14,6 +14,8 @@ topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1,
   if(sum(empty) != 0){
     counts <- counts[!empty,]
     cat(paste("Removed", sum(empty), "blank documents.\n")) }
+
+  cat(sprintf("\nEstimating on a %d document collection.\n", nrow(counts)))
   
   X <- as.simple_triplet_matrix(counts)
   p <- ncol(X) 

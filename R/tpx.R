@@ -83,7 +83,8 @@ tpxSelect <- function(X, K, bf, initheta, alpha, tol, kill, verb,
 
 ## theta initialization
 tpxinit <- function(X, initheta, K1, alpha, verb){
-
+## initheta can be matrix, or c(nK, tmax, tol, verb)
+  
   if(is.matrix(initheta)){
     if(ncol(initheta)!=K1){ stop("mis-match between initheta and K.") }
     if(prod(initheta>0) != 1){ stop("use probs > 0 for initheta.") }
@@ -99,7 +100,14 @@ tpxinit <- function(X, initheta, K1, alpha, verb){
 
   ## set number of initial steps
   if(length(initheta)>1){ tmax <- initheta[2] }
-  else{ tmax <- 2 }
+  else{ tmax <- 3 }
+  ## set the tolerance
+  if(length(initheta)>2){ tol <- initheta[3] }
+  else{ tol <- 10 }
+  ## print option
+  if(length(initheta)>3){ verb <- initheta[4] }
+  else{ verb <- 0 }
+  
 
   if(verb){ cat("Building initial topics") 
             if(verb > 1){ cat(" for K = ") }
@@ -107,13 +115,17 @@ tpxinit <- function(X, initheta, K1, alpha, verb){
             
   nK <- length( Kseq <-  unique(ceiling(seq(2,K1,length=ilength))) )
   initheta <- tpxThetaStart(X, matrix(col_sums(X)/sum(X), ncol=1), matrix(rep(1,nrow(X))), 2)
-  
+
+  if(verb > 0)
+    { cat("\n")
+      print(list(Kseq=Kseq, tmax=tmax, tol=tol)) }
+    
   ## loop over topic numbers
   for(i in 1:nK){
 
     ## Solve for map omega in NEF space
-    fit <- tpxfit(X=X, theta=initheta, alpha=alpha, tol=10, verb=0,
-                  admix=TRUE, grp=NULL, tmax=tmax, wtol=10^{-4}, qnewt=10)
+    fit <- tpxfit(X=X, theta=initheta, alpha=alpha, tol=tol, verb=verb,
+                  admix=TRUE, grp=NULL, tmax=tmax, wtol=-1, qnewt=-1)
     if(verb>1){ cat(paste(Kseq[i],",", sep="")) }
 
     if(i<nK){ initheta <- tpxThetaStart(X, fit$theta, fit$omega, Kseq[i+1]) }
@@ -163,7 +175,7 @@ tpxfit <- function(X, theta, alpha, tol, verb,
   while( update  && iter < tmax ){ 
 
     ## sequential quadratic programming for conditional Y solution
-    if(admix){ Wfit <- tpxweights(n=nrow(X), p=ncol(X), xvo=xvo, wrd=wrd, doc=doc,
+    if(admix && wtol > 0){ Wfit <- tpxweights(n=nrow(X), p=ncol(X), xvo=xvo, wrd=wrd, doc=doc,
                                 start=omega, theta=theta,  verb=0, nef=TRUE, wtol=wtol, tmax=20) }
     else{ Wfit <- omega }
 

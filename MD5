@@ -1,12 +1,12 @@
-f2c340e0c9f5ffc3b0f757d74feb727b *ChangeLog
-4d5bc2e0b72226e65b965180a577347d *DESCRIPTION
+143f1f420b66a2d369b50ea2745e95f7 *ChangeLog
+0a9a8181d49d9c390ed53b338a59df6a *DESCRIPTION
 276c717e610b11e9d9601597c4cd0cae *LICENSE
 1f51e098ebdf572856d59d516316bdc2 *NAMESPACE
 2083a1d3090d730703b59c6d919eea3f *R/count.R
 dbf75cd2595b7bf101d9877f866a7334 *R/mnlm.R
 164914afe4a9cf1361cb404fdf649e13 *R/pls.R
-56b4ec3abe78bd1700d4cbc219c15a9b *R/topics.R
-136b85e007727deac3582536a92c8e9e *R/tpx.R
+7dc525dbeb8bda2a544504720054584d *R/topics.R
+5c0823dc6c4e59261bfe60fa04ef9b08 *R/tpx.R
 4a103863ece31e29f47ffc4eea80dd5c *R/zzz.R
 523865fb9adc6506887504b98f2639a0 *data/congress109.rda
 a4aca1ededafcf6589011132b5a8bdc6 *data/we8there.rda
@@ -40,7 +40,7 @@ f388b9ae7ef84a619a209a937ad7e39f *src/cubic.c
 3fc4c7821a7c6f0073f5c5d469b15a82 *src/cubic.h
 50c615b4be690e8f446f6c6d0825128d *src/latools.c
 7740fa94dae18c033519cb1fb83d9ea7 *src/latools.h
-495a95532da08dedb8fc46b00bcbabbb *src/mnlogit.c
+773ee1b82d620123a0b10837b0c37a3c *src/mnlogit.c
 30467fea3023a7bb3beeeee262e5df32 *src/rhelp.c
 1e7d37fe6e037cf56b0ea2660b45f4c7 *src/rhelp.h
 95d52e7ac594d376f51ae829b863e815 *src/topics.c

@@ -1,3 +1,8 @@
+1.7-3 (26 Dec 2011)
+---
+Print the number of documents
+Strictly EM for initialization
+
 1.7-2 (30 Nov 2011)
 ---
 Allow for unique penalties on each covariate
