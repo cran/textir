@@ -3,6 +3,7 @@ useDynLib(textir)
 import(slam)
 
 export(corr,
+       quadratic,
        cubic,
        freq,
        mnlm,

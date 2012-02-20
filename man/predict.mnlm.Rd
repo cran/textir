@@ -17,7 +17,7 @@ mnlm predict
   \item{...}{Additional unused arguments. }
 }
 \details{ This function returns either the inverse regression sufficient reduction \eqn{F\Phi} for new documents, or
-	  fitted multinomial probabilities given new covariate vectors.
+	  fitted multinomial probabilities given new covariate vectors.  
 	 }
 \value{ Under \code{type="response"}, output is an  \code{nrow(newcounts)} by \code{nrow(object$loadings)} matrix of 
 	predicted probabilities for each response category. 

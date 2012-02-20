@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-
 double cubed(double x)
 { return x*x*x; }
 
@@ -62,6 +61,28 @@ double* solvecubic(double a, double b, double c)
   return roots;
 }
 
+/* x^2 + bx + c root finder 
+   roots[0] is the number of real roots */
+double *solvequadratic(double b, double c)
+{
+  double *roots = new_dvec(3);
+  double q = b*b - 4*c;
+  if(q==0){ // one real
+    roots[0] = 1.0;
+    roots[1] = roots[2] = -0.5*b;
+  }
+  else if(q>0){ // two real
+    roots[0] = 2.0;
+    roots[1] = -0.5*(b + sqrt(q));
+    roots[2] = -0.5*(b - sqrt(q));
+  }
+  else{ // two complex
+    roots[0]  = 0.0;
+    roots[1] = -0.5*b;
+    roots[2] = -0.5*sqrt(-q);
+  }
+  return roots;
+}
 
 void Rcubic(double *coef, double *num)
 {
@@ -73,3 +94,13 @@ void Rcubic(double *coef, double *num)
   free(roots);
 }
   
+
+void Rquadratic(double *coef, double *num)
+{
+  double *roots = solvequadratic(coef[0], coef[1]);
+  *num = roots[0];
+  coef[0] = roots[1];
+  coef[1] = roots[2];
+  free(roots);
+}
+ 

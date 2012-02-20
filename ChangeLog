@@ -1,3 +1,18 @@
+1.8 (20 Feb 2012)
+---
+A set of mnlm revisions:
+	fix the penalty function under joint map estimation
+	cleanup penalty print statements
+	clarify the null category specification
+	add a quadratic solver
+	lower tolerance default and drop tmax
+	scale inputs to have sd of 0.5; fix normalization in fit + predict
+	remove coefficient bounds and warn for larger penalty instead
+	remove delta and dmin as user arguments
+	add gradient conditions at convergence
+	prior rates automatically increase when needed for convergence
+	remove positive count residuals from output
+
 1.7-3 (26 Dec 2011)
 ---
 Print the number of documents

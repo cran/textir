@@ -4,7 +4,7 @@
 #include <Rmath.h>
 #include "latools.h"
 #include "rhelp.h"
-#include "cubic.h"
+#include "polysolve.h"
 #include <time.h>
 
 /* global variables */
@@ -16,7 +16,6 @@ int *m = NULL;
 double *X = NULL;
 int **xi = NULL;
 double **V = NULL;
-double *bmax = NULL;
 double **eta = NULL;
 double *denom = NULL;
 double **B = NULL;
@@ -35,26 +34,16 @@ double neglogpost(){
   
   for(i=0; i<N; i++) L += -X[i]*(eta[xi[1][i]][xi[0][i]] - log(denom[xi[0][i]]));
 
-  for(k=1; k<d; k++){ 
+  for(k=0; k<d; k++){ 
     if(maplam[k]==1) 
-      for(j=0;j<=p;j++) L += lam[k][0]*fabs(B[k][j])/(lam[k][1]+fabs(B[k][j]));
+      for(j=0;j<=p;j++) L += lam[k][0]*log( 1.0 + fabs(B[k][j])/lam[k][1] );
     else if(maplam[k]==0) 
       for(j=0;j<=p;j++) L += lam[k][0]*fabs(B[k][j]);
   }
 
   return L;
+
 }
-
-
-/* calculates and returns the pearson residuals */
-void residuals(double *xhat, double *r){
-  int i;
-  // x.hat fitted counts
-  for(i=0; i<N; i++) xhat[i] = m[xi[0][i]]*exp(eta[xi[1][i]][xi[0][i]] - log(denom[xi[0][i]]));
-  // residuals
-  for(i=0; i<N; i++) r[i] = (X[i]-xhat[i])/sqrt(xhat[i]*(m[xi[0][i]]-xhat[i])/m[xi[0][i]]);
-}
-
 
 /* update eta + B, and return the new objective value */
 
@@ -103,48 +92,35 @@ double bound(double z, int j, int k, double grad)
 {
   double c = 0.0;
   if(maplam[k]==1)
-    c = lam[k][0]*fabs(z)/(lam[k][1] + fabs(z));
+    c = lam[k][0]*log( 1.0 + fabs(z)/lam[k][1] );
   else if(maplam[k]==0) 
     c = lam[k][0]*fabs(z);
 
   return grad*(z-B[k][j]) + 0.5*(z-B[k][j])*(z-B[k][j])*H[k][j] + c;
 }
 
-/* the cubic rooter */
+/* the quadratic rooter */
 
 double findroot(int j, int k, double grad, double sgn)
 {
-  assert(maplam[k]>=0);
+  if(maplam[k]<0) error("mnlogit -> findroot is trying to solve for fixed coeficients.  Please report this bug.");
 
-  double a, b, c, s, r, ghb;
-  
-  s = lam[k][0]*lam[k][1];
-  r = lam[k][1];
-
+  double b, c, ghb;
   ghb = grad/H[k][j]-B[k][j];
-    
-  a = ghb + sgn*2.0*r;
-  b = sgn*ghb*2.0*r + r*r;
-  c = ghb*r*r + sgn*s/H[k][j];
+  b = ghb + sgn*lam[k][1];
+  c = ghb*sgn*lam[k][1] + lam[k][0]/H[k][j];
 
+  double *roots = solvequadratic(b,c);
   int ns = 0;
+
   double sln = 0.0;
-
-  double *roots = solvecubic(a,b,c);
-  int nr = roots[0];
-  if(nr==2) nr = 1; // ignore complex
-
-  for(int h=1; h<=nr; h++)
-    if(sgn == sign(roots[h]))
-      if( ( H[k][j] - 2.0*s/cubed(r+fabs(roots[h])) ) > 0.0 )
-	{ sln = roots[h]; ns++; } 
-     
-  assert(ns <= 1);  
-
-  if(ns == 1)
-    { if(  bound(0.0, j, k, grad) < bound(sln, j, k, grad) ) sln = 0.0; }
-  else sln = 0.0;
-
+  for(int h=1; h<=((int) roots[0]); h++) // check 1 or 2 roots
+    if(sgn == sign(roots[h])) // same sign as current phi
+      if( ( H[k][j] - lam[k][0]/((lam[k][1]+fabs(roots[h]))*(lam[k][1]+fabs(roots[h]))) ) > 0.0 ) // local min
+	if(  bound(0.0, j, k, grad) >= bound(roots[h], j, k, grad) ) // better than zero
+	  { sln = roots[h]; ns++; } 
+  
+  if(ns > 1) warning("multiple candidate solutions in findroot.");  
   free(roots);
   return sln;
 }
@@ -154,7 +130,7 @@ double findroot(int j, int k, double grad, double sgn)
 double Bmove(int j, int k, double grad, double sgn)
 {
   double dbet;
-  assert(maplam[k] >= 0);
+  if(maplam[k]<0) error("mnlogit is trying to solve for fixed coeficients.  Please report this bug.");
   if(H[k][j] == 0.0) return -B[k][j]; // happens only if you have all zero predictors
 
   if(lam[k][0]==0){ // unpenalized (e.g. intercept) parameters
@@ -174,14 +150,13 @@ double Bmove(int j, int k, double grad, double sgn)
   else{ // lambda/beta update
     if(sgn != 0.0) dbet = findroot(j, k, grad, sgn) - B[k][j];
     else{  // check both sides
-      assert(B[k][j] == 0.0);
+      if(B[k][j] != 0.0) error("accounting error in mnlogit -> Bmove.  Please report this bug.");
       double sln = findroot(j, k, grad, +1.0);
       if(sln == 0.0) sln = findroot(j, k, grad, -1.0);
       dbet = sln - B[k][j]; }
   }      
 
   if(fabs(dbet) > D[k][j]) dbet = sign(dbet)*D[k][j]; // trust region bounds 
-  if(fabs(B[k][j]+dbet) > bmax[k]) dbet = sign(B[k][j]+dbet)*bmax[k] - B[k][j]; // numerical overload bounds
   return dbet;
 }
 
@@ -194,7 +169,6 @@ void mnlm_cleanup(){
   if(X){ free(X); X = NULL; }
   if(xi){ delete_imat(xi); xi = NULL; }
   if(V){ delete_mat(V); V = NULL; }
-  if(bmax){ free(bmax); bmax = NULL; }
   if(eta){ delete_mat(eta); eta = NULL; }
   if(denom){ free(denom); denom = NULL; }
   if(B){ delete_mat(B); B = NULL; }
@@ -215,21 +189,22 @@ void mnlm_cleanup(){
  *
  */
 
-void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *niter,
+void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, 
 	      int *N_in, double *X_in, int *xi_in, double *V_in, 
-	      double *beta_vec, double *bmax_in, double *Lout, double *resids, double *fitted,
-	      int *maplam_in, double *lam_in, double *dmin, double *delta, int *verbalize)
+	      double *beta_vec, double *fitted,
+	      int *maplam_in, double *lam_in, double *dmin, double *delta, 
+	      double *Gout, int *verbalize)
 {
   dirty = 1; // flag to say the function has been called
   time_t itime = time(NULL);  // time stamp for periodic R interaction 
 
   int i, j, k, t, verb;
-  double tol, tmax, grad, diff;
+  double tol, grad, diff;
+  double Lold, Lnew;
 
   /** Build everything **/
   verb = *verbalize;
   tol = *tol_in;
-  tmax = *niter;
   n = *n_in;
   p = *p_in;
   d = *d_in;  
@@ -239,7 +214,6 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   X = new_dup_dvec(X_in, N);
   xi = new_imat_fromv(N, 2, xi_in);
   V = new_mat_fromv(n, d, V_in);
-  bmax = new_dup_dvec(bmax_in, d);
   H = new_zero_mat(p+1, d);  
   D = new_mat(p+1, d);
   for(j=0; j<=p; j++) for(k=0; k<d; k++) D[k][j] = delta[0]; 
@@ -252,39 +226,35 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   eta = new_zero_mat(n, p+1);
   la_dgemm( 0, 1, n, d, p+1, d, n, p+1, *V, *B, *eta, 1.0, 0.0 ); 
   denom = new_dzero(n);
-  for(i=0; i<n; i++) for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); 
+  for(i=0; i<n; i++) for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); // includes 1.0 for null category
   if(eta[0][0]!=0.0) myprintf(stdout, "You've input nonzero null category betas; these are not updated.\n");
 
   G = new_zero_mat(p+1, d);
   for(i=0; i<N; i++) for(k=0; k<d; k++) G[k][xi[1][i]] += -X[i]*V[k][xi[0][i]]; 
 
-  Lout[0] = neglogpost();
-  if(isinf(Lout[0])){  
+  Lnew = neglogpost();
+  if(isinf(Lnew)){  
     myprintf(stdout, "\nInfinite initial fit; starting at zero instead.  Perhaps try `normalize=TRUE'.\n");
     for(j=0; j<=p; j++) for(k=0; k<d; k++) B[k][j] = 0.0;
     for(i=0; i<n; i++)
       { for(j=0; j<=p; j++) eta[j][i] = 0.0;
 	denom[i] = ((double) p) + 1.0; }
-    Lout[0]  = neglogpost(); }
-    
+    Lnew  = neglogpost(); } 
+
   diff = tol*100.0;
   t = 0;
   int dozero = 1; 
   double numzero, nregpar;
   double bnew;
+  double rateincrease = 0.0; 
 
   /* introductory print statements */
   if(verb)
     { myprintf(stdout, "*** Logistic Regression with a %d x %d coefficient matrix ***\n", p, d);
-      for(k=0; k<d; k++){
-	if(maplam[k] == 1) myprintf(stdout, "V[%d]: Joint MAP penalty estimation under a gamma(%g,%g) prior\n", k, lam[k][0], lam[k][1]);
-	else if (maplam[k] == 0) myprintf(stdout, "V[%d]: Estimation with L1 penalty of %g\n", k, lam[k][0]);
-	else if (maplam[k] == -1) myprintf(stdout, "V[%d]: Fixed coefficients\n", k);
-      }
-      myprintf(stdout, "Objective L initialized at %g\n", Lout[0]); }
+      myprintf(stdout, "Objective L initialized at %g\n", Lnew); }
   
-  /* optimize until objective stops improving or t>tmax */
-  while(t<tmax && diff > tol){
+  /* optimize until objective stops improving */
+  while(diff > tol | diff < 0){
     numzero = 0.0;
     nregpar = 0.0;
 
@@ -292,7 +262,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
     for(j=1; j<=p; j++)
       for(k=0; k<d; k++)
 	if(maplam[k]>=0){ 
-	  if(B[k][j] != 0.0 || dozero || lam[k][0]==0 || t < 3){
+	  if(B[k][j] != 0.0 || dozero || lam[k][0]==0 || t < 3 || runif(0,1) < 0.1){
 	    // gradient
 	    grad = G[k][j];
 	    for(i=0; i<n; i++) grad += ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i];
@@ -303,7 +273,8 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
 	    // check and update dependencies
 	    if(bnew != B[k][j])
 	      { D[k][j] = fmax(*dmin,fmax(0.5*D[k][j], 2.0*fabs(B[k][j] - bnew)));
-		update(j, k,  bnew); assert(D[k][j] > 0.0); }
+		update(j, k,  bnew); 
+		if(D[k][j] <= 0.0) error("negative bound window in mnlogit. Please report this bug."); }
 	  }
 	  // sum the zeros and check for escape from R
 	  if(k>0)
@@ -313,20 +284,35 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
     
     // iterate
     t++;
-    Lout[t] = neglogpost();
-    diff = Lout[t-1] - Lout[t];
+    Lold = Lnew;
+    Lnew = neglogpost();
+    diff = Lold - Lnew;
     
     // print 
-    if(Lout[t]!=Lout[t] || !isfinite(Lout[t]) || Lout[t] < 0){ 
+    if(Lnew!=Lnew || !isfinite(Lnew) || Lnew < 0){ 
       diff = 0.0;  dozero=1; 
       myprintf(stdout, "L is NaN!  Try a larger `penalty' or use normalize=TRUE. \n"); }
     else if(verb)
       { myprintf(stdout, "t = %d: L = %g (diff of %g) with %g%% zero loadings.\n", 
-		 t, Lout[t], diff, 100.0*(numzero/nregpar));
-	if(t==tmax) myprintf(stdout, "Terminating optimization; exhausted max number of iterations.\n"); }
+		 t, Lnew, diff, 100.0*(numzero/nregpar)); }
    
     if(diff < 0.0){
-      myprintf(stdout, "WARNING: non-monotonic convergence. \nThis means you have a non-concave posterior, leading to an unstable MAP. \nTry increasing the hyperprior rate on your penalty or using fixed penalties.\n"); }
+      i = 0;
+      for(k=0; k<d; k++)
+	if(maplam[k]==1)
+	  { lam[k][0] *= 2.0;
+	    lam[k][1] *= 2.0; 
+	    i++; }
+      if(i>0 && rateincrease < 8){
+	if(verb) myprintf(stdout, "WARNING: non-monotonic convergence, probably due to a non-concave posterior.  \n");
+	rateincrease += 1.0;
+	Lnew = neglogpost();}
+      else{
+	myprintf(stdout, "WARNING: the algorithm is not converging, probably due probabilities very close to one. \nYou may need to (log?) re-scale your covariates or use a larger fixed penalty.\n");
+	break;
+      }
+    }
+    lam_in[0] = rateincrease;
 
     // check for active set update
     if(dozero == 1) dozero = 0;
@@ -336,9 +322,16 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, int *n
   }
   
   /* clean, collect, and exit */
-  *niter = t+1; // total iterations
   for(j=0; j<=p; j++) for(k=0; k<d; k++) beta_vec[k*(p+1) + j] = B[k][j];  // beta fit
-  residuals(fitted, resids);
+  for(i=0; i<N; i++) fitted[i] = exp(eta[xi[1][i]][xi[0][i]] - log(denom[xi[0][i]] - 1.0*((double) p > 1))); // exclude null for > 2 cat
+  for(k=1; k<d; k++)   // gradient conditions
+    for(j=1; j<=p; j++){  
+      t = p*(k-1) + j-1;
+      Gout[t] = G[k][j];
+      for(i=0; i<n; i++) Gout[t] +=  ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i]; 
+      if(maplam[k]==1) Gout[t] += sign(B[k][j])*lam[k][0]/(lam[k][1]+fabs(B[k][j])); 
+      else Gout[t]  += lam[k][0]*sign(B[k][j]); 
+    }
   mnlm_cleanup(); // clean 
   dirty = 0;  // declare normal exit
 }
