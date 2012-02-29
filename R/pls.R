@@ -32,13 +32,14 @@ pls <- function(X, y, K=1, scale=TRUE, verb=TRUE){
     yhat <- cbind(yhat, lm(as.numeric(y)~z[,1:k])$fitted)
   }  
   if(verb){ cat("done.\n")}
-
+  
   fwdmod = lm(as.numeric(y)~z)
+
   dimnames(z) <- list(dimnames(X)[[1]], direction=paste("z",1:ncol(z),sep=""))
   dimnames(yhat) <- list(dimnames(X)[[1]], model=paste("pls",1:ncol(z),sep=""))
   dimnames(phi) <- list(dimnames(X)[[2]], factor=paste("v",1:ncol(z) -1 ,sep=""))
   dimnames(v) <- list(dimnames(X)[[1]], factor=paste("v",1:ncol(z) -1 ,sep=""))
-
+  
   out <- list(y=y, X=X, directions=z, loadings=phi, factors=v, fitted = yhat, fwdmod = fwdmod, scale=scale)
   class(out) <- "pls"
   return(out) }
@@ -72,17 +73,20 @@ print.pls <- function(x, ...){
   cat(paste("\nA pls(", ncol(x$directions), ") object, reduced from ", ncol(x$X), " input variables. \n\n", sep="")) }
 
  ## S3 method predict function
-predict.pls <- function(object, newdata, ...)
+predict.pls <- function(object, newdata, response=TRUE, ...)
 {
   if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
-  if(!is.null(object$scale)){
+  if(object$scale != 0){
     if(!inherits(newdata, "simple_triplet_matrix"))
       { newdata <- t(t(newdata)/object$scale) } else{ newdata$v <-  newdata$v/object$scale[newdata$j] }
   }
   if(inherits(newdata, "simple_triplet_matrix")){
     z <- tcrossprod_simple_triplet_matrix(newdata, t(object$loadings))
     } else { z <- newdata%*%object$loadings }
-  return(z)
+  if(response){
+    fitted <- cbind(1,z)%*%object$fwdmod$coef
+    return(fitted)
+  } else{  return(z) }
 }
 
   

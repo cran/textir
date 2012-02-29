@@ -151,7 +151,7 @@ int sqpw(int p, int nwrd, int K,  int *wrd, double *x,
 
     /* check and update */
     if(fabs(sum_dvec(B, nw)) > .001 || (info !=0 && dosysv == 0)){
-      myprintf(stdout, "trouble in wsolve\n"); 
+      myprintf(mystdout, "trouble in wsolve\n"); 
       nw = wactivate(K, w, active); 
       return 0;
     }
@@ -164,10 +164,10 @@ int sqpw(int p, int nwrd, int K,  int *wrd, double *x,
     copy_dvec(wold, w, K);
 
     if(verb==1){ 
-      myprintf(stdout, 
+      myprintf(mystdout, 
 	       "Omega Fit: iter = %d, unique words = %d, active=%d, diff = %g \n",
 	       iter, nwrd, K-nw,  diff);
-      myprintf(stdout, "          W = "); print_dvec(w, K, stdout); }
+      myprintf(mystdout, "          W = "); print_dvec(w, K, mystdout); }
     
     iter++;
   }
@@ -200,7 +200,7 @@ void Romega( int *n, int *p, int *K,
 #pragma omp parallel for private(i) 
  for(i=0; i<(*n); i++) 
    if(sqpw(*p, doc[i+1]-doc[i], *K, &wrd[doc[i]], &X[doc[i]], theta,  &W[i*(*K)], *nef, *tol, *tmax, speakup) == 0)
-     myprintf(stdout, "Failed to converge for omega at i = %d\n", i+1); 
+     myprintf(mystdout, "Failed to converge for omega at i = %d\n", i+1); 
 
  delete_mat(theta);
 }
@@ -297,17 +297,17 @@ void RnegHW(int *n_in, int *p_in, int *K_in, double *omeg, double *thet,
 }
 
 
-void logit(int d, double *eta, double *prob){
+void Rlogit(int *d, double *eta, double *prob){
   int j;
   double lp0 = log(prob[0]);
-  for(j=1; j<d; j++) eta[j-1] = log(prob[j]) - lp0; }
+  for(j=1; j<*d; j++) eta[j-1] = log(prob[j]) - lp0; }
 
-void expit(int d, double *prob, double *eta){
+void Rexpit(int *d, double *prob, double *eta){
   int j;
   prob[0] = 1; 
-  for(j=1; j<d; j++) prob[j] = exp(eta[j-1]);
-  double p0 = sum_dvec(prob, d);
-  for(j=0; j<d; j++) prob[j] *= 1.0/p0;  }
+  for(j=1; j<*d; j++) prob[j] = exp(eta[j-1]);
+  double p0 = sum_dvec(prob, *d);
+  for(j=0; j<*d; j++) prob[j] *= 1.0/p0;  }
 
 
 void RtoNEF(int *n_in, int *p_in, int *K_in, double *Y, double *theta, double *tomega){
@@ -316,8 +316,8 @@ void RtoNEF(int *n_in, int *p_in, int *K_in, double *Y, double *theta, double *t
   int p = *p_in;
   int K = *K_in;
 
-  for(l=0; l<K; l++) logit(p, &Y[l*(p-1)], &theta[l*p]);
-  for(l=0; l<n; l++) logit(K, &Y[K*(p-1) + l*(K-1)], &tomega[l*K]); }
+  for(l=0; l<K; l++) Rlogit(&p, &Y[l*(p-1)], &theta[l*p]);
+  for(l=0; l<n; l++) Rlogit(&K, &Y[K*(p-1) + l*(K-1)], &tomega[l*K]); }
 
 
 void RfromNEF(int *n_in, int *p_in, int *K_in, double *Y, double *theta, double *tomega){
@@ -326,8 +326,8 @@ void RfromNEF(int *n_in, int *p_in, int *K_in, double *Y, double *theta, double 
   int p = *p_in;
   int K = *K_in;
 
-  for(l=0; l<K; l++) expit(p, &theta[l*p], &Y[l*(p-1)]);
-  for(l=0; l<n; l++) expit(K, &tomega[l*K], &Y[K*(p-1) + l*(K-1)]); }
+  for(l=0; l<K; l++) Rexpit(&p, &theta[l*p], &Y[l*(p-1)]);
+  for(l=0; l<n; l++) Rexpit(&K, &tomega[l*K], &Y[K*(p-1) + l*(K-1)]); }
 
 
 void Rzhat(int *n_in, int *p_in, int *K_in, int *N_in, double *xhat, 

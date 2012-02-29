@@ -5,20 +5,9 @@ topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1,
                    bf=FALSE, kill=2, ord=TRUE, verb=1, ...)
   ## tpxselect defaults: tmax=10000, wtol=10^(-4), qnewt=100, grp=NULL, admix=TRUE, nonzero=FALSE, dcut=-10
 {
-  ## check counts (can be an object from tm, slam, or a simple co-occurance matrix)
-  if(class(counts)[1] == "TermDocumentMatrix"){ counts <- t(counts) }
-  if(is.null(dimnames(counts)[[1]])){ dimnames(counts)[[1]] <- paste("doc",1:nrow(counts)) }
-  if(is.null(dimnames(counts)[[2]])){ dimnames(counts)[[2]] <- paste("wrd",1:ncol(counts)) }
-
-  empty <- row_sums(counts) == 0
-  if(sum(empty) != 0){
-    counts <- counts[!empty,]
-    cat(paste("Removed", sum(empty), "blank documents.\n")) }
-
-  cat(sprintf("\nEstimating on a %d document collection.\n", nrow(counts)))
-  
-  X <- as.simple_triplet_matrix(counts)
+  X <- CheckCounts(counts)
   p <- ncol(X) 
+  cat(sprintf("\nEstimating on a %d document collection.\n", nrow(X)))
 
   ## check the prior parameters for theta
   if(prod(shape>0) != 1){ stop("use shape > 0\n") }
@@ -38,15 +27,16 @@ topics <- function(counts, K, shape=NULL, initopics=NULL, tol=0.1,
   if(ord){ worder <- order(col_sums(tpx$omega), decreasing=TRUE) } # order by decreasing usage
   else{ worder <- 1:K }
   ## Main parameters
-  theta=matrix(tpx$theta[,worder], ncol=K, dimnames=list(phrase=dimnames(counts)[[2]], topic=paste(1:K)) )
+  theta=matrix(tpx$theta[,worder], ncol=K, dimnames=list(phrase=dimnames(X)[[2]], topic=paste(1:K)) )
   omega=matrix(tpx$omega[,worder], ncol=K, dimnames=list(document=NULL, topic=paste(1:K)) )
-  if(nrow(omega)==nrow(counts)){ dimnames(omega)[[1]] <- dimnames(counts)[[1]] }
+  if(nrow(omega)==nrow(X)){ dimnames(omega)[[1]] <- dimnames(X)[[1]] }
   
   ## topic object
   out <- list(K=K, theta=theta, omega=omega, BF=tpx$BF, D=tpx$D, X=X)
   class(out) <- "topics"
   invisible(out) }
 
+ 
 ## S3 method predict function
 predict.topics <- function(object, newcounts, loglhd=FALSE, ...)
   ## tpxweights optional arguments and defauls are verb=FALSE, nef=TRUE, wtol=10^{-5}, tmax=1000
@@ -223,4 +213,44 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
   par(mar=old.mar)
 }
 
+## logit and expit, treating first element as null
+logit <- function(prob){
+  d <- length(prob)
+  return(.C("Rlogit", d=as.integer(d), eta=double(d-1), prob=as.double(prob))$eta)
+}
+
+expit <- function(eta){
+  d <- length(eta)+1
+  return(.C("Rexpit", d=as.integer(d), prob=double(d), eta=as.double(eta))$prob)
+}
+
+### topic weight variance matrix (in NEF parametrization)
+topicVar <- function(counts, theta, omega){
+  X <- CheckCounts(counts)
+  if(nrow(omega) != nrow(X)) stop("omega does not match counts")
+  if(ncol(omega) != ncol(theta)) stop("omega does not match theta")
+
+  K <- ncol(omega)
+  n <- nrow(X)
+  p <- nrow(theta)
   
+  q <- tpxQ(theta=theta, omega=omega, doc=X$i, wrd=X$j)
+  H <- array(.C("RnegHW",
+                  n = as.integer(n),
+                  p = as.integer(p),
+                  K = as.integer(K-1),
+                  omeg = as.double(omega[,-1]),
+                  thet = as.double(theta[,-1]),
+                  doc = as.integer(X$i-1),
+                  wrd = as.integer(X$j-1),
+                  cnt = as.double(X$v),
+                  q = as.double(q),
+                  N = as.integer(length(q)),
+                  H = double(n*(K-1)^2),
+                  PACKAGE="textir")$H,
+               dim=c(K-1,K-1,n))
+
+  S <- array(apply(H, 3, function(h) tryCatch(solve(h), error=function(e) solve(h + diag(.00001,K-1))) ),
+             dim=c(K-1,K-1,n), dimnames=list(topics=1:(K-1), topics=1:(K-1), doc=dimnames(X)[[1]]) )
+  return(S)
+}

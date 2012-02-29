@@ -2,6 +2,18 @@
 
 ## ** Only referenced from topics.R
 
+## check counts (can be an object from tm, slam, or a simple co-occurance matrix)
+CheckCounts <- function(counts){
+  if(class(counts)[1] == "TermDocumentMatrix"){ counts <- t(counts) }
+  if(is.null(dimnames(counts)[[1]])){ dimnames(counts)[[1]] <- paste("doc",1:nrow(counts)) }
+  if(is.null(dimnames(counts)[[2]])){ dimnames(counts)[[2]] <- paste("wrd",1:ncol(counts)) }
+  empty <- row_sums(counts) == 0
+  if(sum(empty) != 0){
+    counts <- counts[!empty,]
+    cat(paste("Removed", sum(empty), "blank documents.\n")) }
+  return(as.simple_triplet_matrix(counts))
+}
+ 
 ## Topic estimation and selection for a list of K values
 tpxSelect <- function(X, K, bf, initheta, alpha, tol, kill, verb,
                       admix=TRUE, grp=NULL, tmax=10000,
@@ -188,6 +200,7 @@ tpxfit <- function(X, theta, alpha, tol, verb,
     Y <- qn$Y
     
     if(qn$L < L){  # happens on bad Wfit, so fully reverse
+      if(verb > 10){ cat("_reversing a step_") }
       move <- tpxEM(X=X, m=m, theta=theta, omega=omega, alpha=alpha, admix=admix, grp=grp)
       qn$L <-  tpxlpost(X=X, theta=move$theta, omega=move$omega, alpha=alpha, admix=admix, grp=grp) }
 

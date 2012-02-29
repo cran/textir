@@ -1,3 +1,13 @@
+1.8-1 (29 Feb 2012)
+---
+add expit,logit, and topicVar for variance calculations
+restrict print to R console
+remove asserts from package compilation
+update gradient output to account for zero solutions
+fit scale bug in pls predict
+allow response scaling in pls predict
+add nonconvergence warning in topics
+
 1.8 (20 Feb 2012)
 ---
 A set of mnlm revisions:

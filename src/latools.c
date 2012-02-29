@@ -1,4 +1,5 @@
 #include "latools.h"
+#include "rhelp.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -308,8 +309,8 @@ void print_mat(int nr, int nc, double **mat, FILE *outfile)
   int i,j;
   for(i=0; i<nr; i++) {
     for(j=0; j<nc; j++) {
-      if(j==nc-1) fprintf(outfile, "%g\n", mat[j][i]);
-      else fprintf(outfile, "%g ", mat[j][i]);
+      if(j==nc-1) myprintf(outfile, "%g\n", mat[j][i]);
+      else myprintf(outfile, "%g ", mat[j][i]);
     }
   }
 }
@@ -319,8 +320,8 @@ void print_imat(int nr, int nc, int **mat, FILE *outfile)
   int i,j;
   for(i=0; i<nr; i++) {
     for(j=0; j<nc; j++) {
-      if(j==nc-1) fprintf(outfile, "%d\n", mat[j][i]);
-      else fprintf(outfile, "%d ", mat[j][i]);
+      if(j==nc-1) myprintf(outfile, "%d\n", mat[j][i]);
+      else myprintf(outfile, "%d ", mat[j][i]);
     }
   }
 }
@@ -434,8 +435,8 @@ void copy_dvec(double *v, double *orig, int n)
 void print_dvec(double *v, int n, FILE *outfile)
 {
   int i;
-  for(i=0; i<n; i++) fprintf(outfile, "%g ", v[i]);
-  fprintf(outfile, "\n");
+  for(i=0; i<n; i++) myprintf(outfile, "%g ", v[i]);
+  myprintf(outfile, "\n");
 }
 
 
@@ -571,8 +572,8 @@ void copy_ivec(int *v, int *orig, int n)
 void print_ivec(int *v, int n, FILE *outfile)
 {
   int i;
-  for(i=0; i<n; i++) fprintf(outfile, "%d ", v[i]);
-  fprintf(outfile, "\n");
+  for(i=0; i<n; i++) myprintf(outfile, "%d ", v[i]);
+  myprintf(outfile, "\n");
 }
 
 

@@ -109,7 +109,7 @@ mnlm(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=1),
 \item{covarSD}{If \code{normalize=TRUE}, the original covariate standard deviations.  Otherwise empty.}
 \item{prior}{The penalty prior (gamma distribution parameters, or fixed values).}
 \item{lambda}{Posterior MAPs (or just the fixed input values) for each coefficient's penalty.}
-\item{gradient}{Loading parameter gradients at convergence.}
+\item{gradient}{Loading parameter gradients at convergence (set to 0 for zero coefficients that lie at the point of a local minimum).}
 \item{fitted}{Fitted count expectations.  With binary response, this is a vector of fitted probabilities. 
 	For binomial or multinomial response, it is a simple triplet matrix
 	 with empty entries for zero count observations.}

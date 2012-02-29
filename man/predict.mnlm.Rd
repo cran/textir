@@ -16,8 +16,7 @@ mnlm predict
 		     Can be either a simple \code{matrix} or a \code{simple_triplet_matrix}.   }
   \item{...}{Additional unused arguments. }
 }
-\details{ This function returns either the inverse regression sufficient reduction \eqn{F\Phi} for new documents, or
-	  fitted multinomial probabilities given new covariate vectors.  
+\details{ Under \code{'response'}, this returns fitted multinomial probabilities given new covariate vectors.  Under \code{'reduction'}, we provide the sufficient reduction \eqn{F\Phi} for new documents, with \eqn{F} a document-term frequency matrix (i.e., the counts divided by document totals).
 	 }
 \value{ Under \code{type="response"}, output is an  \code{nrow(newcounts)} by \code{nrow(object$loadings)} matrix of 
 	predicted probabilities for each response category. 

@@ -227,14 +227,14 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
   la_dgemm( 0, 1, n, d, p+1, d, n, p+1, *V, *B, *eta, 1.0, 0.0 ); 
   denom = new_dzero(n);
   for(i=0; i<n; i++) for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); // includes 1.0 for null category
-  if(eta[0][0]!=0.0) myprintf(stdout, "You've input nonzero null category betas; these are not updated.\n");
+  if(eta[0][0]!=0.0) myprintf(mystdout, "You've input nonzero null category betas; these are not updated.\n");
 
   G = new_zero_mat(p+1, d);
   for(i=0; i<N; i++) for(k=0; k<d; k++) G[k][xi[1][i]] += -X[i]*V[k][xi[0][i]]; 
 
   Lnew = neglogpost();
   if(isinf(Lnew)){  
-    myprintf(stdout, "\nInfinite initial fit; starting at zero instead.  Perhaps try `normalize=TRUE'.\n");
+    myprintf(mystdout, "\nInfinite initial fit; starting at zero instead.  Perhaps try `normalize=TRUE'.\n");
     for(j=0; j<=p; j++) for(k=0; k<d; k++) B[k][j] = 0.0;
     for(i=0; i<n; i++)
       { for(j=0; j<=p; j++) eta[j][i] = 0.0;
@@ -250,8 +250,8 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
 
   /* introductory print statements */
   if(verb)
-    { myprintf(stdout, "*** Logistic Regression with a %d x %d coefficient matrix ***\n", p, d);
-      myprintf(stdout, "Objective L initialized at %g\n", Lnew); }
+    { myprintf(mystdout, "*** Logistic Regression with a %d x %d coefficient matrix ***\n", p, d);
+      myprintf(mystdout, "Objective L initialized at %g\n", Lnew); }
   
   /* optimize until objective stops improving */
   while(diff > tol | diff < 0){
@@ -291,9 +291,9 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
     // print 
     if(Lnew!=Lnew || !isfinite(Lnew) || Lnew < 0){ 
       diff = 0.0;  dozero=1; 
-      myprintf(stdout, "L is NaN!  Try a larger `penalty' or use normalize=TRUE. \n"); }
+      myprintf(mystdout, "L is NaN!  Try a larger `penalty' or use normalize=TRUE. \n"); }
     else if(verb)
-      { myprintf(stdout, "t = %d: L = %g (diff of %g) with %g%% zero loadings.\n", 
+      { myprintf(mystdout, "t = %d: L = %g (diff of %g) with %g%% zero loadings.\n", 
 		 t, Lnew, diff, 100.0*(numzero/nregpar)); }
    
     if(diff < 0.0){
@@ -304,11 +304,11 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
 	    lam[k][1] *= 2.0; 
 	    i++; }
       if(i>0 && rateincrease < 8){
-	if(verb) myprintf(stdout, "WARNING: non-monotonic convergence, probably due to a non-concave posterior.  \n");
+	if(verb) myprintf(mystdout, "WARNING: non-monotonic convergence, probably due to a non-concave posterior.  \n");
 	rateincrease += 1.0;
 	Lnew = neglogpost();}
       else{
-	myprintf(stdout, "WARNING: the algorithm is not converging, probably due probabilities very close to one. \nYou may need to (log?) re-scale your covariates or use a larger fixed penalty.\n");
+	myprintf(mystdout, "WARNING: the algorithm is not converging, probably due probabilities very close to one. \nYou may need to (log?) re-scale your covariates or use a larger fixed penalty.\n");
 	break;
       }
     }
@@ -324,13 +324,19 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
   /* clean, collect, and exit */
   for(j=0; j<=p; j++) for(k=0; k<d; k++) beta_vec[k*(p+1) + j] = B[k][j];  // beta fit
   for(i=0; i<N; i++) fitted[i] = exp(eta[xi[1][i]][xi[0][i]] - log(denom[xi[0][i]] - 1.0*((double) p > 1))); // exclude null for > 2 cat
+  double lambda_hat;
   for(k=1; k<d; k++)   // gradient conditions
     for(j=1; j<=p; j++){  
       t = p*(k-1) + j-1;
       Gout[t] = G[k][j];
       for(i=0; i<n; i++) Gout[t] +=  ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i]; 
-      if(maplam[k]==1) Gout[t] += sign(B[k][j])*lam[k][0]/(lam[k][1]+fabs(B[k][j])); 
-      else Gout[t]  += lam[k][0]*sign(B[k][j]); 
+      if(maplam[k]==1) lambda_hat = lam[k][0]/(lam[k][1]+fabs(B[k][j])); 
+      else lambda_hat = lam[k][0];
+      if(B[k][j] != 0.0) Gout[t] += sign(B[k][j])*lambda_hat;
+      else
+	{ if(Gout[t] - lambda_hat > 0.0) Gout[t] -= lambda_hat;
+	  else if(Gout[t] + lambda_hat < 0.0) Gout[t] += lambda_hat;
+	  else Gout[t] = 0.0; }
     }
   mnlm_cleanup(); // clean 
   dirty = 0;  // declare normal exit

@@ -25,6 +25,11 @@
 #ifdef RPRINT
 #include <R_ext/Print.h>
 #include <R.h>
+FILE *mystdout = (FILE*) 0;
+FILE *mystderr = (FILE*) 1;
+#else
+FILE *mystdout = stdio;
+FILE *mystderr = stderr;
 #endif
 #include <stdarg.h>
 #include <time.h>
@@ -44,8 +49,8 @@ void myprintf(FILE *outfile, const char *str, ...)
   va_start(argp, str);
   
   #ifdef RPRINT
-  if(outfile == stdout) Rvprintf(str, argp);
-  else if(outfile == stderr) REvprintf(str, argp);
+  if(outfile == mystdout) Rvprintf(str, argp);
+  else if(outfile == mystderr) REvprintf(str, argp);
   else vfprintf(outfile, str, argp);
   #else
   vfprintf(outfile, str, argp);
@@ -119,20 +124,20 @@ void myflush(FILE *outfile)
 #else
   fflush(outfile);
 #endif
-} 
+}
 
 
 /*
  * my_r_process_events:
  *
  * at least every 1 second(s) pass control back to
- * R so that it can check for interrupts and/or
+ * R so that it can check for interrupts and/or 
  * process other R-gui events
  */
 
 time_t my_r_process_events(time_t itime)
 {
-#ifdef RPRINT
+#ifdef RPRINT  
   time_t ntime = time(NULL);
 
   if(ntime - itime > 1) {

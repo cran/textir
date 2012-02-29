@@ -13,7 +13,10 @@ export(corr,
        sdev,
        tfidf,
        topics,
-       predict.topics)
+       predict.topics,
+       topicVar,
+       expit,
+       logit)
 
 S3method(plot,mnlm)
 S3method(predict,mnlm)
