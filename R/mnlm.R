@@ -1,8 +1,8 @@
 ##### Estimation for Regularized Logit Multinomial Regression  ######
 
 ## Main function; most happens in .C 
-mnlm <- function(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=1), start=NULL,
-                 tol=0.01, bins=0, verb=FALSE, ...)
+mnlm <- function(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=1/2), start=NULL,
+                 tol=1e-2, bins=0, verb=FALSE, ...)
 {
   
   on.exit(.C("mnlm_cleanup", PACKAGE = "textir"))
@@ -187,7 +187,7 @@ predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
   else{
     if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
     newdata <- as.matrix(newdata)
-    if(object$normalized){ newdata <- normalize(newdata, m=object$covarMean, s=2*object$covarSD) }
+    if(object$normalized){ newdata <- normalize(newdata, m=object$covarMean, s=object$covarSD) }
     if(ncol(newdata)!=ncol(object$loadings)){ stop("newdata must be a matrix with the same columns as object$covars") }
     
     eta <- cbind(rep(1,nrow(newdata)),newdata)%*%t(cbind(object$intercept,object$loadings))
@@ -315,7 +315,7 @@ cubic <- function(a, b, c, quiet=FALSE, plot=FALSE)
 #######  Undocumented "mnlm"-related utility functions #########
 
 ## check the inputs and bin
-mncheck <- function(counts, covars, normalize, bins, verb, delta=1, dmin=0, nullfactor=0){
+mncheck <- function(counts, covars, normalize, bins, verb, delta=1, dmin=0.01, nullfactor=0){
 
   ## check counts (can be an object from tm, slam, or a simple co-occurance matrix or a factor)
   if(is.null(dim(counts))){ 
@@ -338,7 +338,7 @@ mncheck <- function(counts, covars, normalize, bins, verb, delta=1, dmin=0, null
       covarSD <- apply(covars,2,sd)
       if(prod(covarSD!=0)!=1){ stop("You have a constant covariate; do not include an intercept term in 'covars'.") }
       covarMean <- colMeans(covars)
-      covars <- normalize(covars, m=covarMean, s=2*covarSD)
+      covars <- normalize(covars, m=covarMean, s=covarSD)
     }
 
   ## bin and add the null category

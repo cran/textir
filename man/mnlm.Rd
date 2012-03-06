@@ -7,8 +7,8 @@ Estimation for high-dimensional Multinomial Logistic Regression
 MAP estimation of multinomial logistic regression models.  
   }
 \usage{
-mnlm(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=1), 
-                     start=NULL, tol=0.01, bins=0, verb=FALSE, ...)
+mnlm(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=1/2), 
+                     start=NULL, tol=1e-2, bins=0, verb=FALSE, ...)
 }
 \arguments{
   \item{counts}{
@@ -22,7 +22,7 @@ mnlm(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=1),
     This does not include the intercept, which is ALWAYS added in the design matrix.   
 }
  \item{normalize}{
-    Whether or not to normalize the covariates to have mean zero and standard deviation of 1/2.  
+    Whether or not to normalize the covariates to have mean zero and standard deviation of 1.  
 }
 \item{penalty}{
   This input argument is either a single fixed value of the L1 (lasso) penalty \eqn{\lambda>0}, 

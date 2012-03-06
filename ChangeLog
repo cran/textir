@@ -1,3 +1,10 @@
+1.8-2 (6 Mar 2012)
+---
+Add topic variance tools
+Set dimin=0.01
+Revert imput scaling to sd of 1
+Default (1, 0.5) prior
+
 1.8-1 (29 Feb 2012)
 ---
 add expit,logit, and topicVar for variance calculations
