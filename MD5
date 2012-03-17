@@ -1,11 +1,11 @@
-5a1f8a99a2e6bac9a5dc5561b0894231 *ChangeLog
-d3a291a113721ce19370b8eb9a740ce2 *DESCRIPTION
+9303a2fe862cea0eaae46abcd370a0f6 *ChangeLog
+4db883b7ea24f177b6de969bbbc586ea *DESCRIPTION
 276c717e610b11e9d9601597c4cd0cae *LICENSE
 7bdb1e4f28eb586f28ba3ecb88a1d875 *NAMESPACE
 2083a1d3090d730703b59c6d919eea3f *R/count.R
-ba3d2a949d396cd526988741a10f9305 *R/mnlm.R
-6ef4af95dc7b0698f23119e156b574f5 *R/pls.R
-71defba475419946a46f93745722c100 *R/topics.R
+59a6413c913a92a2814bce6731848a0f *R/mnlm.R
+67f595a51946d4607dabeeb8c3795f5f *R/pls.R
+ba3f45388ca374f3d3d5bcb30c7d3e83 *R/topics.R
 694da5703e9406888a2ecba555c68eca *R/tpx.R
 523865fb9adc6506887504b98f2639a0 *data/congress109.rda
 a4aca1ededafcf6589011132b5a8bdc6 *data/we8there.rda
@@ -14,7 +14,7 @@ a4aca1ededafcf6589011132b5a8bdc6 *data/we8there.rda
 7b62a395a784a6fbb677a87d7cf7f55d *man/congress109.Rd
 b6a647a64ba3a65ef0f29ebae6b594f4 *man/corr.Rd
 91b13cc23c5bfabbba6a3bb7a722c188 *man/freq.Rd
-c5bf52aa8aade9c36d30d55b8986dfa7 *man/mnlm.Rd
+416fa0edadd6250e2e0cba73fab9324d *man/mnlm.Rd
 84aa8e6c76ffa65766d1a765ce304cdb *man/normalize.Rd
 5eb23340248e86cc36dcdbc8f5289196 *man/plot.mnlm.Rd
 930157c5069189a06c0c6ed4b56e65cb *man/plot.pls.Rd

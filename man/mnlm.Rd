@@ -7,7 +7,7 @@ Estimation for high-dimensional Multinomial Logistic Regression
 MAP estimation of multinomial logistic regression models.  
   }
 \usage{
-mnlm(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=1/2), 
+mnlm(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), 
                      start=NULL, tol=1e-2, bins=0, verb=FALSE, ...)
 }
 \arguments{

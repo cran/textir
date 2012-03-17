@@ -1,3 +1,10 @@
+1.8-3 (17 Mar 2012)
+---
+fix scale bug in pls
+set normalize=TRUE default
+check for Inf in expit/logit
+vectorize expit/logt
+
 1.8-2 (6 Mar 2012)
 ---
 Add topic variance tools

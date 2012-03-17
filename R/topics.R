@@ -215,14 +215,33 @@ plot.topics <- function(x, type=c("weight","resid"), group=NULL, labels=NULL,
 
 ## logit and expit, treating first element as null
 logit <- function(prob){
-  d <- length(prob)
-  return(.C("Rlogit", d=as.integer(d), eta=double(d-1), prob=as.double(prob))$eta)
-}
+  f <- function(p) .C("Rlogit", d=as.integer(d), eta=double(d-1), prob=as.double(p))$eta
+  prob[prob < 1e-10] <- 1e-10
+  prob[1-prob < 1e-10] <- 1-1e-10
+  if(is.matrix(prob) || is.data.frame(prob)){
+    d <- ncol(prob)
+    eta <- matrix(t(apply(prob,1,f)), ncol=d-1, dimnames=list(row=dimnames(prob)[[1]], col=dimnames(prob)[[2]][-1]))
+  }
+  else{
+    d <- length(prob)
+    eta <- f(prob)
+  }
+  return(eta) }
 
 expit <- function(eta){
-  d <- length(eta)+1
-  return(.C("Rexpit", d=as.integer(d), prob=double(d), eta=as.double(eta))$prob)
-}
+  f <- function(e) .C("Rexpit", d=as.integer(d), prob=double(d), eta=as.double(e))$prob
+  eta[eta==Inf] <- 1e10
+  eta[eta==-Inf] <- -1e10
+  if(is.matrix(eta) || is.data.frame(eta)){
+    d <- ncol(eta)+1
+    prob <- matrix(t(apply(eta,1,f)), ncol=d, dimnames=list(row=dimnames(eta)[[1]], col=c('nullcat',dimnames(eta)[[2]])))
+  }
+  else{
+    d <- length(eta)+1
+    prob <- f(eta)
+  }
+  return(prob) }
+
 
 ### topic weight variance matrix (in NEF parametrization)
 topicVar <- function(counts, theta, omega){

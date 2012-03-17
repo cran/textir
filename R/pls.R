@@ -7,6 +7,7 @@ pls <- function(X, y, K=1, scale=TRUE, verb=TRUE){
       { X <- t(t(X)/sdf) } else{ X$v <-  X$v/sdf[X$j] }
     scale = sdf
   }
+  else{ scale = NULL }
  
   phi <- matrix(ncol=K, nrow=ncol(X))
   z <- matrix(ncol=K, nrow=nrow(X))
@@ -76,7 +77,7 @@ print.pls <- function(x, ...){
 predict.pls <- function(object, newdata, response=TRUE, ...)
 {
   if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
-  if(object$scale != 0){
+  if(!is.null(object$scale)){
     if(!inherits(newdata, "simple_triplet_matrix"))
       { newdata <- t(t(newdata)/object$scale) } else{ newdata$v <-  newdata$v/object$scale[newdata$j] }
   }

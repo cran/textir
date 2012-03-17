@@ -1,7 +1,7 @@
 ##### Estimation for Regularized Logit Multinomial Regression  ######
 
 ## Main function; most happens in .C 
-mnlm <- function(counts, covars, normalize=FALSE, penalty=c(shape=1,rate=1/2), start=NULL,
+mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), start=NULL,
                  tol=1e-2, bins=0, verb=FALSE, ...)
 {
   
