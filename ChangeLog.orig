@@ -7,7 +7,11 @@ Proper error exiting upon numerical overload
 Remove gradient condition calculations
 Fix boxplots for mnlm with counts > 1
 Add randomeffects (undocumented for now)
-
+<<<<<<< local
+=======
+Better error treatment on L=NaN initialization
+>>>>>>> other
+	
 1.8-3 (17 Mar 2012)
 ---
 fix scale bug in pls

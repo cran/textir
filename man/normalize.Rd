@@ -20,8 +20,8 @@ normalize(x, m=NULL, s=NULL, undo=FALSE)
  Under default, a matrix with mean-zero and variance-one columns.  
  If shift and scale are specified, a matrix with columns shifted by \code{-m}  and divided by \code{s}.
  If \code{undo=TRUE}, and shift and scale are specified, an un-normalized matrix with column means \code{m} and standard deviations \code{s}.
+ In the special case where \code{x} is a \code{simple_triplet_matrix} and \code{m=0}, columns are scaled by \code{s} but left unshifted and the function returns a \code{simple_triplet_matrix}.
 }
-\note{ Not designed for huge sparse matrices. }
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}
 }

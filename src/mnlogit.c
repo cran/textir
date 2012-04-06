@@ -6,16 +6,22 @@
 #include "rhelp.h"
 #include "polysolve.h"
 #include <time.h>
+# ifdef _OPENMP
+#include <omp.h>
+# endif
 
 /* global variables */
 
-int n, p, d, N;
+int n, p, d, Nx, Nv, RE;
 
 int dirty = 0;
-int *m = NULL;
+double *m = NULL;
 double *X = NULL;
-int **xi = NULL;
-double **V = NULL;
+int **xind = NULL;
+int *xi = NULL;
+double *V = NULL;
+int **vind = NULL;
+int *vk = NULL;
 double **eta = NULL;
 double *denom = NULL;
 double **B = NULL;
@@ -24,6 +30,10 @@ double **H = NULL;
 double **D = NULL;
 double **lam = NULL;
 int *maplam = NULL;
+double *revar = NULL;
+double *remean = NULL;
+double **U = NULL;
+double *nvec;
 
 /* un-normalized negative log posterior */
 
@@ -32,7 +42,7 @@ double neglogpost(){
   double L = 0.0;
   int i, j, k;
   
-  for(i=0; i<N; i++) L += -X[i]*(eta[xi[1][i]][xi[0][i]] - log(denom[xi[0][i]]));
+  for(i=0; i<Nx; i++) L += -X[i]*(eta[xind[1][i]][xind[0][i]] - log(denom[xind[0][i]]));
 
   for(k=0; k<d; k++){ 
     if(maplam[k]==1) 
@@ -40,6 +50,7 @@ double neglogpost(){
     else if(maplam[k]==0) 
       for(j=0;j<=p;j++) L += lam[k][0]*fabs(B[k][j]);
   }
+  if(RE) for(i=0;i<n;i++) for(j=1;j<=p;j++) L += (U[j][i]-remean[i])*(U[j][i]-remean[i])*0.5/revar[i];
 
   return L;
 
@@ -51,15 +62,48 @@ void update(int j, int k, double bnew)
 {
   assert(j!=0);
   int i;
+  copy_dvec(nvec, eta[j], n);
+  for(i=vk[k]; i<vk[k+1]; i++) nvec[vind[0][i]] += V[i]*(bnew-B[k][j]);
   for(i=0; i<n; i++)
-    { 
-      denom[i] += -exp(eta[j][i]);
-      eta[j][i] = eta[j][i] + V[k][i]*(bnew-B[k][j]);
-      denom[i] += exp(eta[j][i]);
-    }
-
+    { denom[i] += exp(nvec[i]) - exp(eta[j][i]);
+      eta[j][i] = nvec[i]; }
   B[k][j] = bnew;
 }
+
+/* lub factor */
+double calcF(int i, int j, double delta){
+  double E = denom[i] - exp(eta[j][i]);      
+  double erm = exp(eta[j][i]-delta);
+  double erp = exp(eta[j][i]+delta);
+      
+  if(E < erm) return erm/E + E/erm;
+  else if(E > erp) return erp/E + E/erp;
+  else return 2.0;
+} 
+
+/* draw random effects and update eta+denom */
+
+void update_rei(int i){
+  assert(RE);
+  int j, l;
+  double g, h, dbet, delta;
+  delta = 0.1; // fixed trust to avoid storage
+
+  for(j=1; j<=p; j++){ 
+    g = 0.0;
+    for(l=xi[i]; l<xi[i+1]; l++) if(xind[1][l]==j){ g += -X[l]; break; }
+    g += m[i]*exp(eta[j][i] - log(denom[i])) + (U[j][i] - remean[i])/revar[i];
+    if(g == 0.0) continue;
+    h = m[i]/(calcF(i, j, delta)+2.0) + 1.0/revar[i];
+    dbet = -g/h;
+    if(fabs(dbet) < 0.0001) continue; // numerical overload otherwise
+    if(fabs(dbet) > delta) dbet = sign(dbet)*delta; 
+    U[j][i] += dbet;
+    eta[j][i] += dbet;
+    denom[i] += exp(eta[j][i]) - exp(eta[j][i]-dbet);
+  }
+}
+
 
 /* Hessian bound updates  */
 
@@ -68,21 +112,8 @@ void calcH(int j, int k){
   double Hkj = 0.0;
   assert(D[k][j] >= 0.0);
 
-  // #pragma omp parallel for private(i) reduction(+: Hkj)
-  for(i=0; i<n; i++)
-    {
-      double F, E, erm, erp; 
-      E = denom[i] - exp(eta[j][i]);      
-      erm = exp(eta[j][i]-D[k][j]);
-      erp = exp(eta[j][i]+D[k][j]);
-      
-      if(E < erm) F = erm/E + E/erm;
-      else if(E > erp) F = erp/E + E/erp;
-      else F = 2.0; 
-         
-      Hkj += V[k][i]*V[k][i]*((double) m[i])/(F+2.0);   
-    }
-
+  for(i=0; i<n; i++) nvec[i] = calcF(i, j, D[k][j]);
+  for(i=vk[k]; i<vk[k+1]; i++) Hkj += V[i]*V[i]*m[vind[0][i]]/(nvec[vind[0][i]]+2.0);   
   H[k][j] = Hkj;
 }
 
@@ -166,9 +197,13 @@ void mnlm_cleanup(){
   if(!dirty) return;
 
   if(m){ free(m); m = NULL; }
+  if(nvec){ free(nvec); nvec = NULL; }
   if(X){ free(X); X = NULL; }
-  if(xi){ delete_imat(xi); xi = NULL; }
-  if(V){ delete_mat(V); V = NULL; }
+  if(xind){ delete_imat(xind); xind = NULL; }
+  if(xi){ free(xi); xi = NULL; }
+  if(V){ free(V); V = NULL; }
+  if(vind){ delete_imat(vind); vind = NULL; }
+  if(vk){ free(vk); vk = NULL; }
   if(eta){ delete_mat(eta); eta = NULL; }
   if(denom){ free(denom); denom = NULL; }
   if(B){ delete_mat(B); B = NULL; }
@@ -177,6 +212,9 @@ void mnlm_cleanup(){
   if(D){ delete_mat(D); D = NULL; }
   if(maplam){ free(maplam); maplam = NULL; }
   if(lam){ delete_mat(lam); lam = NULL; }
+  if(remean){ free(remean); remean = NULL; }
+  if(revar){ free(revar); revar = NULL; }
+  if(U){ delete_mat(U); U = NULL; }
 }
 
 /* 
@@ -189,11 +227,14 @@ void mnlm_cleanup(){
  *
  */
 
-void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in, 
-	      int *N_in, double *X_in, int *xi_in, double *V_in, 
+void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in, 
+	      int *Nx_in, double *X_in, int *xind_in, int *xi_in,
+	      int *Nv_in, double *V_in, int *vind_in, int *vk_in,
 	      double *beta_vec, double *fitted,
-	      int *maplam_in, double *lam_in, double *dmin, double *delta, 
-	      double *Gout, int *verbalize)
+	      int *maplam_in, double *lam_in, 
+	      double *dmin, double *dinit, 
+	      double *Gout, int *RE_in, double *randeff,
+	      int *verbalize)
 {
   dirty = 1; // flag to say the function has been called
   time_t itime = time(NULL);  // time stamp for periodic R interaction 
@@ -209,37 +250,66 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
   p = *p_in;
   d = *d_in;  
 
-  m = new_dup_ivec(m_in, n); 
-  N = *N_in;
-  X = new_dup_dvec(X_in, N);
-  xi = new_imat_fromv(N, 2, xi_in);
-  V = new_mat_fromv(n, d, V_in);
+  nvec = new_dzero(n);
+  m = new_dup_dvec(m_in, n); 
+
+  Nx = *Nx_in;
+  X = new_dup_dvec(X_in, Nx);
+  xind = new_imat_fromv(Nx, 2, xind_in);
+
+  Nv = *Nv_in;
+  V = new_dup_dvec(V_in, Nv);
+  vind = new_imat_fromv(Nv, 2, vind_in);
+  vk = new_dup_ivec(vk_in, d+1); 
+
   H = new_zero_mat(p+1, d);  
   D = new_mat(p+1, d);
-  for(j=0; j<=p; j++) for(k=0; k<d; k++) D[k][j] = delta[0]; 
+  for(j=0; j<=p; j++) for(k=0; k<d; k++) D[k][j] = dinit[0]; 
 
   maplam = new_dup_ivec(maplam_in, d);
   lam = new_mat_fromv(2, d, lam_in);
   
   B = new_mat_fromv(p+1, d, beta_vec);
 
-  eta = new_zero_mat(n, p+1);
-  la_dgemm( 0, 1, n, d, p+1, d, n, p+1, *V, *B, *eta, 1.0, 0.0 ); 
+  RE = *RE_in;
+  if(RE){
+    xi = new_dup_ivec(xi_in, n+1); 
+    remean = new_dup_dvec(randeff, n);
+    revar = new_dup_dvec(&randeff[n], n);
+    U = new_mat(n,p+1);
+    zero_dvec(U[0], n);
+    for(j=1; j<=p; j++) copy_dvec(U[j], remean, n);
+    eta = new_dup_mat(n, p+1, U);
+  } else{ eta = new_zero_mat(n, p+1); }
+  
+  for(j=0; j<=p; j++) for(i=0; i<Nv; i++) eta[j][vind[0][i]] += V[i]*B[vind[1][i]][j];
   denom = new_dzero(n);
   for(i=0; i<n; i++) for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); // includes 1.0 for null category
   if(eta[0][0]!=0.0) myprintf(mystdout, "You've input nonzero null category betas; these are not updated.\n");
 
-  G = new_zero_mat(p+1, d);
-  for(i=0; i<N; i++) for(k=0; k<d; k++) G[k][xi[1][i]] += -X[i]*V[k][xi[0][i]]; 
+  G = new_mat_fromv(p+1, d, Gout);
 
   Lnew = neglogpost();
-  if(isinf(Lnew)){  
-    myprintf(mystdout, "\nInfinite initial fit; starting at zero instead.  Perhaps try `normalize=TRUE'.\n");
+  if(isnan(Lnew)){
+    myprintf(mystdout, "B\n");
+    print_mat(p+1, d, B, mystdout);
+    myprintf(mystdout, "denom\n");
+    print_dvec(denom, n, mystdout);
+    myprintf(mystdout, "RE = %d (%d)\n", RE, U == NULL);
+  }
+  if(isinf(Lnew) || isnan(Lnew)){  
+    myprintf(mystdout, "\nInfinite or NaN initial fit; starting at zero instead.  Perhaps try `normalize=TRUE'.\n");
     for(j=0; j<=p; j++) for(k=0; k<d; k++) B[k][j] = 0.0;
-    for(i=0; i<n; i++)
-      { for(j=0; j<=p; j++) eta[j][i] = 0.0;
-	denom[i] = ((double) p) + 1.0; }
-    Lnew  = neglogpost(); } 
+    if(RE){
+      copy_mat(n, p+1, eta, U);
+      zero_dvec(denom, n);
+      for(i=0; i<n; i++) for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); }
+    else{
+      zero_mat(eta, n, p+1);
+      for(i=0; i<n; i++) denom[i] = ((double) p) + 1.0; }
+    Lnew  = neglogpost(); 
+  }
+    
 
   diff = tol*100.0;
   t = 0;
@@ -247,6 +317,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
   double numzero, nregpar;
   double bnew;
   double rateincrease = 0.0; 
+
 
   /* introductory print statements */
   if(verb)
@@ -265,7 +336,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
 	  if(B[k][j] != 0.0 || dozero || lam[k][0]==0 || t < 3 || runif(0,1) < 0.1){
 	    // gradient
 	    grad = G[k][j];
-	    for(i=0; i<n; i++) grad += ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i];
+	    for(i=vk[k]; i<vk[k+1]; i++) grad += m[vind[0][i]]*exp(eta[j][vind[0][i]] - log(denom[vind[0][i]]))*V[i]; 
 	    // curvature 
 	    calcH(j, k); 
 	    // conditional newton update
@@ -281,7 +352,12 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
 	    { nregpar++;
 	      if(B[k][j] == 0.0) numzero++; }
 	  itime = my_r_process_events(itime); }
-    
+
+    if(RE){
+#pragma omp parallel for private(i) 
+      for(i=0; i<n; i++) update_rei(i); 
+    }
+
     // iterate
     t++;
     Lold = Lnew;
@@ -290,8 +366,10 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
     
     // print 
     if(Lnew!=Lnew || !isfinite(Lnew) || Lnew < 0){ 
-      diff = 0.0;  dozero=1; 
-      myprintf(mystdout, "L is NaN!  Try a larger `penalty' or use normalize=TRUE. \n"); }
+      warning("The algorithm did not converge.  \n  L is NaN, probably due probabilities very close to one. \n  You may need to (log?) re-scale your covariates or use a larger penalty.\n"); 
+      dozero = 1;
+      diff = 0.0;
+    }
     else if(verb)
       { myprintf(mystdout, "t = %d: L = %g (diff of %g) with %g%% zero loadings.\n", 
 		 t, Lnew, diff, 100.0*(numzero/nregpar)); }
@@ -308,8 +386,9 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
 	rateincrease += 1.0;
 	Lnew = neglogpost();}
       else{
-	myprintf(mystdout, "WARNING: the algorithm is not converging, probably due probabilities very close to one. \nYou may need to (log?) re-scale your covariates or use a larger fixed penalty.\n");
-	break;
+	 warning("The algorithm did not converge.  \n  This is probably due probabilities very close to one. \n  You may need to (log?) re-scale your covariates or use a larger penalty.\n");
+	 dozero = 1;
+	 diff = 0.0;
       }
     }
     lam_in[0] = rateincrease;
@@ -323,21 +402,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, int *m_in, double *tol_in,
   
   /* clean, collect, and exit */
   for(j=0; j<=p; j++) for(k=0; k<d; k++) beta_vec[k*(p+1) + j] = B[k][j];  // beta fit
-  for(i=0; i<N; i++) fitted[i] = exp(eta[xi[1][i]][xi[0][i]] - log(denom[xi[0][i]] - 1.0*((double) p > 1))); // exclude null for > 2 cat
-  double lambda_hat;
-  for(k=1; k<d; k++)   // gradient conditions
-    for(j=1; j<=p; j++){  
-      t = p*(k-1) + j-1;
-      Gout[t] = G[k][j];
-      for(i=0; i<n; i++) Gout[t] +=  ((double) m[i])*exp(eta[j][i] - log(denom[i]))*V[k][i]; 
-      if(maplam[k]==1) lambda_hat = lam[k][0]/(lam[k][1]+fabs(B[k][j])); 
-      else lambda_hat = lam[k][0];
-      if(B[k][j] != 0.0) Gout[t] += sign(B[k][j])*lambda_hat;
-      else
-	{ if(Gout[t] - lambda_hat > 0.0) Gout[t] -= lambda_hat;
-	  else if(Gout[t] + lambda_hat < 0.0) Gout[t] += lambda_hat;
-	  else Gout[t] = 0.0; }
-    }
+  for(i=0; i<Nx; i++) fitted[i] = exp(eta[xind[1][i]][xind[0][i]] - log(denom[xind[0][i]] - 1.0*((double) p > 1))); // exclude null for > 2 cat
   mnlm_cleanup(); // clean 
   dirty = 0;  // declare normal exit
 }

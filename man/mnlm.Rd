@@ -18,16 +18,18 @@ mnlm(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2),
     See the details for a note on null-category parameterization.
 }
   \item{covars}{
-    A matrix of \code{ncol(covars)} covariate values for each of the \code{nrow(counts)} observations.
+    A \code{matrix} or \code{simple_triplet_matrix} of \code{ncol(covars)} covariate values for each of the \code{nrow(counts)} observations.
     This does not include the intercept, which is ALWAYS added in the design matrix.   
 }
  \item{normalize}{
-    Whether or not to normalize the covariates to have mean zero and standard deviation of 1.  
+    Whether or not to normalize the covariates. Default is \code{TRUE}.  If \code{covars} is a \code{matrix}, 
+    this will scale the inputs to have mean zero and standard deviation of one.   If \code{covars} is a \code{simple_triplet_matrix}, 
+    we assume that you want to stay in sparse format; hence the inputs are scaled to have sd = 1 but left unshifted.
 }
 \item{penalty}{
   This input argument is either a single fixed value of the L1 (lasso) penalty \eqn{\lambda>0}, 
   or a vector of length 2 containing \eqn{[s, r]} -- shape '\eqn{s}' and rate '\eqn{r}' parameters for the Gamma prior on \eqn{\lambda}, 
-  such that \eqn{E\lambda =s/r}.  Refer to the details section for additional information.
+  such that \eqn{E\lambda =s/r}.   Refer to the details section for additional information. The default is chosen to be appropriate for normized covariates. 
   \code{penalty} 
   can also be a list containing penalty specification
   for each column of the 
@@ -85,8 +87,8 @@ mnlm(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2),
  which corresponds to the L1 penalty \eqn{\lambda|z|}, or it is assigned a \eqn{Gamma(s, r)} 
  prior and estimated jointly with the coefficient, which corresponds to the non-convex penalty \eqn{s*log[1 + |z|/r]}.  
 
- In the case of joint penalty-coefficient estimation, prior precision \eqn{r^2/s = r/E\lambda} controls the degree of penalty curvature.  
- In the case that the precision is small relative to the amount of information in the likelihood, the posterior can become multimodal.  
+ In the case of joint penalty-coefficient estimation, prior variance \eqn{s/r^2 = E\lambda/r} controls the degree of penalty curvature.  
+ In the case that the variance is large relative to the amount of information in the likelihood, the posterior can become multimodal.  
  Since this leads to unstable optimization and less meaningful MAP estimates, 
  \code{mnlm} will warn and automatically double \eqn{r} and \eqn{s}  until obtaining a concave posterior. 
  If the resulting prior precision is higher than you would like, 
@@ -101,15 +103,14 @@ mnlm(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2),
 \item{counts}{\code{simple_triplet_matrix} form of the \code{counts} input matrix}
 \item{X}{If \code{bins>0}, the binned counts matrix used for analysis.}
 \item{covars}{The input covariates, possibly normalized.}
-\item{V}{If \code{bins>0}, the binned (and possibly normalized) covariate matrix used for analysis.}
+\item{V}{If \code{bins>0}, the binned (and possibly normalized) covariate \code{simple_triplet_matrix} used for analysis.}
 \item{penalty}{The penalty specification upon convergence.}
-\item{normalized}{An indicator for whether the covariates were normalized to have mean 0 and standard deviation 1/2.}
+\item{normalized}{The input \code{normalize} indicator.}
 \item{binned}{An indicator for whether the observations was binned.}
-\item{covarMean}{If \code{normalize=TRUE}, the original covariate means.  Otherwise empty.}
+\item{covarMean}{If \code{normalize=TRUE}, the amount covariates were shifted (original means for matrix \code{covars}, 0 for sparse stm \code{covars}).  Otherwise empty.}
 \item{covarSD}{If \code{normalize=TRUE}, the original covariate standard deviations.  Otherwise empty.}
 \item{prior}{The penalty prior (gamma distribution parameters, or fixed values).}
 \item{lambda}{Posterior MAPs (or just the fixed input values) for each coefficient's penalty.}
-\item{gradient}{Loading parameter gradients at convergence (set to 0 for zero coefficients that lie at the point of a local minimum).}
 \item{fitted}{Fitted count expectations.  With binary response, this is a vector of fitted probabilities. 
 	For binomial or multinomial response, it is a simple triplet matrix
 	 with empty entries for zero count observations.}
@@ -137,7 +138,7 @@ p <- (1+exp(-(v*2)))^{-1}
 y <- rbinom(n, size=1, prob=p)
 
 ## fit the logistic model
-summary( fit <- mnlm(y, v) )
+summary( fit <- mnlm(y, v, verb=TRUE) )
 par(mfrow=c(1,2))
 plot(fit)
 
@@ -154,7 +155,7 @@ train <- Cushings[Cushings$Type != "u",]
 newdata <- as.matrix(Cushings[Cushings$Type == "u", 1:2])
 
 ## fit, summarize, predict, and plot
-fit <- mnlm(counts=factor(train$Type), covars=train[,1:2], normalize=TRUE)
+fit <- mnlm(counts=factor(train$Type), covars=train[,1:2])
 summary(fit)
 predict(fit, newdata)
 par(mfrow=c(1,1))

@@ -36,12 +36,11 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 data(we8there)
 
 ## use bins to estimate with counts collapsed across equal ratings 1...5
-summary( fitwe8 <- mnlm(we8thereCounts, we8thereRatings$Overall, normalize=TRUE, bins=5) )
+summary( fitwe8 <- mnlm(we8thereCounts, we8thereRatings$Overall, bins=5) )
 plot(fitwe8, type="reduction", v=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
 
 ## Fit a topic model (use lower tol for true convergence)
-tpx <- topics(we8thereCounts, K=20, tol=10)
-par(mfrow=c(1,1))
+tpx <- topics(we8thereCounts, K=10, tol=100)
 plot(tpx, group=we8thereRatings$Overall>3, col=c(2,3), labels=c("Bad","Good"))
 summary(tpx)
 

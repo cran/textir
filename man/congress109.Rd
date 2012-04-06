@@ -41,17 +41,18 @@ Taddy (2011), \emph{Estimation and Selection for Topic Models}.
 Matt Taddy, \email{taddy@chicagobooth.edu}
 }
 
-\seealso{ mnlm, pls, we8there, plot.mnlm, normalize }
+\seealso{ mnlm, pls, we8there, plot.mnlm, summary.mnlm }
 
 \examples{
 data(congress109)
 
-## Inverse Regression Sentiment Modeling 
-summary(fitRep <- mnlm(congress109Counts, congress109Ideology$repshare, normalize=TRUE, bins=10))
-plot(fitRep, type="reduction", pch=21, bg=c(4,3,2)[congress109Ideology$party])
-
 ## Bivariate sentiment factors (roll-call vote common scores)
-fitCS <- mnlm(congress109Counts, congress109Ideology[,6:7], normalize=TRUE, bins=10)
+fitCS <- mnlm(congress109Counts, congress109Ideology[,6:7], bins=5, penalty=c(4,1/2))
+
+## plot the fit
+plot(fitCS, log='xy', boxwex=.2)
+
+## plot the inverse regression reduction
 par(mfrow=c(1,2))
 plot(fitCS, type="reduction", v=congress109Ideology$repshare, xlab="Republican Vote-Share",
 	  covar=1, pch=21, bg=c(4,3,2)[congress109Ideology$party], main="1st common score")
@@ -67,7 +68,7 @@ summary(fitCS, y=congress109Ideology$repshare)
 
 ## Fit topic model (use lower tol for true convergence)
 par(mfrow=c(1,1))
-tpx <- topics(congress109Counts, K=12, tol=10)
+tpx <- topics(congress109Counts, K=10, tol=100)
 plot(tpx, group=congress109Ideology$party=="R", col=c(4,2), labels=c("Dem","GOP"))
 summary(tpx)
 

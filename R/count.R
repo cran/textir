@@ -2,8 +2,13 @@
 
 ## converting count to frequency matrix
 freq <- function(x, byrow=TRUE){
-    if(byrow){ return( x/row_sums(x) ) }
-    else{ return(t(t(x)/col_sums(x))) }
+    if(byrow){ s <- row_sums(x)
+               s[s==0] <- 1
+               return( x/s ) }
+    else{
+      s <- col_sums(x)
+      s[s==0] <- 1
+      return(t(t(x)/s)) }
 }
 
 ## converting a count/freq matrix to tfidf
@@ -37,6 +42,12 @@ sdev <- function(x){
 
 ##  normalizing design matrices
 normalize <- function(x, m=NULL, s=NULL, undo=FALSE){
+  if(!is.null(m)){
+    if(is.simple_triplet_matrix(x) && m == 0){
+      if(!undo) x$v <- x$v/s[x$j]
+      else x$v <- x$v*s[x$j]
+      return(x) }
+  }
   x <- as.matrix(x)
   if(!undo){
     if(is.null(m)){ m <- apply(x,2,mean) }

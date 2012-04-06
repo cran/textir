@@ -29,8 +29,9 @@ Matt Taddy, \email{taddy@chicagobooth.edu}
 \examples{
 data(wsjibm)
 ## fit a simple topic model
-summary( newstpx <- topics(wsjibmCounts, K=10), nwrd=10 )
+summary( newstpx <- topics(wsjibmCounts, K=10, tol=100), nwrd=10 )
 
+\dontrun{
 ## fit topics over years, using prior shape to allow them to change in time
 year <- factor(1900 + as.POSIXlt(wsjibmReturns$DATE)$year)
 Y <- nlevels(year)
@@ -44,6 +45,5 @@ for(i in 1:Y){
       shape <- annualtopics[[i]]$theta*delta }
 ## top 5 words by topic in past 4 years
 dimnames(topwords) <- list(topic=rep(1:5,each=5), year=levels(year))
-print(topwords[,Y - 3:0])	   	  	         
-
+print(topwords[,Y - 3:0]) }	  	         
 }
