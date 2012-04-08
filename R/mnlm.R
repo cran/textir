@@ -84,13 +84,15 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
 
   ## drop the null category and format output
   coef <- matrix(map$coef, ncol=d)
+  map$fitted[is.nan(map$fitted)|!is.finite(map$fitted)|is.na(map$fitted)] <- 1/ncol(X)
+  
   if(ncol(X)>2){
     if(sum(X[,1])>0){ m <- m-X[,1]$v }
     xhat <- simple_triplet_matrix(i=X$i, j=X$j, v=map$fitted*m[X$i], dimnames=dimnames(X))[,-1]
     X <- X[,-1]
     intercept <- matrix(coef[-1,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]],"intercept"))
     loadings <- matrix(coef[-1,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]], covariate=dimnames(covars)[[2]]))
-  } else{ 
+  } else{
     xhat <- as.matrix(simple_triplet_matrix(i=X$i, j=X$j, v=map$fitted, dimnames=dimnames(X)))
     xhat[xhat[,2]==0,2] <- 1 - xhat[xhat[,2]==0,1]
     xhat <- xhat[,2] 
@@ -206,13 +208,14 @@ predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
   }
   else{
     if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
-    newdata <- as.matrix(newdata)
     if(object$normalized){ newdata <- normalize(newdata, m=object$covarMean, s=object$covarSD) }
     if(ncol(newdata)!=ncol(object$loadings)){ stop("newdata must be a matrix with the same columns as object$covars") }
-    
-    eta <- cbind(rep(1,nrow(newdata)),newdata)%*%t(cbind(object$intercept,object$loadings))
-    if(ncol(eta)==1){ P <- exp(eta)/(1+exp(eta)) }
-    else{ P <- exp(eta)/row_sums(exp(eta)) }
+    newdata <- as.simple_triplet_matrix(newdata)
+
+    expeta <- exp(tcrossprod_simple_triplet_matrix(cbind(rep(1,nrow(newdata)),newdata),cbind(object$intercept,object$loadings)))
+    expeta[!is.finite(expeta)] <- max(expeta[is.finite(expeta)])
+    if(ncol(expeta)==1){ P <- expeta/(1+expeta) }
+    else{ P <- expeta/row_sums(expeta) }
     dimnames(P) <- list(dimnames(newdata)[[1]], probability=dimnames(object$loadings)[[1]])
     return(P)
   }
@@ -358,7 +361,7 @@ mncheck <- function(counts, covars, normalize, bins, verb, delta=1, dmin=0.01, n
         covarMean <- colMeans(covars) }
       
       covarSD <- sdev(covars)
-      if(any(covarSD==0)){ warning("You have a constant covariate (ie column of 'covars' with sd=0); do not include an intercept term.")
+      if(any(covarSD==0)){ warning("You have a column of 'covars' with sd=0; do not include an intercept term.")
                            covarSD[covarSD==0] <- 1  }
       covars <- normalize(covars, m=covarMean, s=covarSD)
     }
@@ -455,6 +458,7 @@ buildprior <- function(penalty, d, verb=0){
         }
       }
       else if(length(penalty[[i]]) == 2){
+        if(any(penalty[[i]]<=0)) stop("Gamma hyperprior requires parameters > 0")
         maplam = c(maplam,1)
         lampar = c(lampar, c(penalty[[i]][1], penalty[[i]][2]))
         if(verb && d<10) cat(sprintf("Gamma(%g,%g) prior on penalties for column %d\n", penalty[[i]][1], penalty[[i]][2], i-1))
@@ -468,7 +472,8 @@ buildprior <- function(penalty, d, verb=0){
       lampar <- c(c(0,0),rep(c(penalty,0),d-1)) 
       if(verb) cat(sprintf("Fixed L1 penalty of %g.\n", penalty))
     }
-    else if(length(penalty)==2){ 
+    else if(length(penalty)==2){
+      if(any(penalty<=0)) stop("Gamma hyperprior requires parameters > 0")
       maplam = c(0,rep(1,d-1))
       lampar = c(c(0,0), rep(c(penalty[1], penalty[2]),d-1))
       if(verb) cat(sprintf("Gamma(%g,%g) prior on penalties.\n", penalty[1], penalty[2]))

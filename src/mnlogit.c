@@ -290,15 +290,8 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
   G = new_mat_fromv(p+1, d, Gout);
 
   Lnew = neglogpost();
-  if(isnan(Lnew)){
-    myprintf(mystdout, "B\n");
-    print_mat(p+1, d, B, mystdout);
-    myprintf(mystdout, "denom\n");
-    print_dvec(denom, n, mystdout);
-    myprintf(mystdout, "RE = %d (%d)\n", RE, U == NULL);
-  }
   if(isinf(Lnew) || isnan(Lnew)){  
-    myprintf(mystdout, "\nInfinite or NaN initial fit; starting at zero instead.  Perhaps try `normalize=TRUE'.\n");
+    warning(" Infinite or NaN initial fit; starting at zero instead.  \n  Try `normalize=TRUE' or a larger penalty shape or rate.\n");
     for(j=0; j<=p; j++) for(k=0; k<d; k++) B[k][j] = 0.0;
     if(RE){
       copy_mat(n, p+1, eta, U);
@@ -308,6 +301,10 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
       zero_mat(eta, n, p+1);
       for(i=0; i<n; i++) denom[i] = ((double) p) + 1.0; }
     Lnew  = neglogpost(); 
+    if(isinf(Lnew) || isnan(Lnew)){
+      warning(" Probabilities of exactly zero in your likelihood.  \n   You need to use a larger penalty.\n");
+      Lnew = 100000000.0; 
+    }
   }
     
 
@@ -366,7 +363,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
     
     // print 
     if(Lnew!=Lnew || !isfinite(Lnew) || Lnew < 0){ 
-      warning("The algorithm did not converge.  \n  L is NaN, probably due probabilities very close to one. \n  You may need to (log?) re-scale your covariates or use a larger penalty.\n"); 
+      warning("The algorithm did not converge (non-finite likelihood).  \n   Try `normalize=TRUE' or a larger penalty shape or rate.\n"); 
       dozero = 1;
       diff = 0.0;
     }
@@ -386,7 +383,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
 	rateincrease += 1.0;
 	Lnew = neglogpost();}
       else{
-	 warning("The algorithm did not converge.  \n  This is probably due probabilities very close to one. \n  You may need to (log?) re-scale your covariates or use a larger penalty.\n");
+	 warning("The algorithm did not converge (non-decreasing likelihood).  \n  Try `normalize=TRUE' or a larger penalty shape or rate.\n");
 	 dozero = 1;
 	 diff = 0.0;
       }
