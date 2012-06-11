@@ -24,7 +24,7 @@ usage percentages (i.e. \code{colMeans(omega)}) and the
 top \code{nwrd} phrases by term-lift for each topic in \code{tpk}.  The 
 matrix of top \code{nwrd} phrases and their associated lift is returned invisibly. }
 \references{
-Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
 \url{http://arxiv.org/abs/1109.4518}
 }
 \author{

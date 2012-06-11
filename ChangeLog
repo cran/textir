@@ -1,7 +1,21 @@
+1.8-6 (Jun 11 2012)
+---
+updated LUB calculation
+added print.mnlm to namespace
+add ROC plot option for mnlm
+have normalize check for s=0
+fix load=0 for covar or counts with sd=0 
+add coef S3 method from mnlm
+return mnlm loadings as stm
+remove lambda from mnlm return
+remove null category for multinomials
+add ridge penalization option
+use omp flags to work with R's configure
+
 1.8-5 ( Apr 8 2012)
 ---
 minor bug fixes
-	
+
 1.8-4 ( Apr 6 2012)
 ---
 Proper treatment of Big-K:

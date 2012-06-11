@@ -22,7 +22,7 @@ mnlm summary
 	\code{y} onto the sufficient reduction \code{freq(X)\%*\%loadings}. 
 }
 \references{
-Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
+Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
 \url{http://arxiv.org/abs/1012.2098}
 }
 \author{

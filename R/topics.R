@@ -234,6 +234,7 @@ expit <- function(eta){
   eta[eta==-Inf] <- -1e10
   if(is.matrix(eta) || is.data.frame(eta)){
     d <- ncol(eta)+1
+    if(is.null(dimnames(eta)[[2]])) dimnames(eta)[[2]] <- paste("nef",1:ncol(eta),sep='')
     prob <- matrix(t(apply(eta,1,f)), ncol=d, dimnames=list(row=dimnames(eta)[[1]], col=c('nullcat',dimnames(eta)[[2]])))
   }
   else{

@@ -1,6 +1,5 @@
 // need to make sure both lams are k indexed (not k-1)
 #include <stdlib.h>
-#include <assert.h>
 #include <Rmath.h>
 #include "latools.h"
 #include "rhelp.h"
@@ -45,12 +44,14 @@ double neglogpost(){
   for(i=0; i<Nx; i++) L += -X[i]*(eta[xind[1][i]][xind[0][i]] - log(denom[xind[0][i]]));
 
   for(k=0; k<d; k++){ 
-    if(maplam[k]==1) 
-      for(j=0;j<=p;j++) L += lam[k][0]*log( 1.0 + fabs(B[k][j])/lam[k][1] );
-    else if(maplam[k]==0) 
-      for(j=0;j<=p;j++) L += lam[k][0]*fabs(B[k][j]);
+    if(maplam[k]==0) 
+      for(j=0;j<p;j++) L += lam[k][0]*fabs(B[k][j]);
+    else if(maplam[k]==1) 
+      for(j=0;j<p;j++) L += lam[k][0]*log( 1.0 + fabs(B[k][j])/lam[k][1] );
+    else if(maplam[k]==2)
+      for(j=0;j<p;j++) L += B[k][j]*B[k][j]*0.5*lam[k][1];
   }
-  if(RE) for(i=0;i<n;i++) for(j=1;j<=p;j++) L += (U[j][i]-remean[i])*(U[j][i]-remean[i])*0.5/revar[i];
+  if(RE) for(i=0;i<n;i++) for(j=0;j<p;j++) if(p>2 | j == 1) L += (U[j][i]-remean[i])*(U[j][i]-remean[i])*0.5/revar[i];
 
   return L;
 
@@ -60,7 +61,6 @@ double neglogpost(){
 
 void update(int j, int k, double bnew)
 {
-  assert(j!=0);
   int i;
   copy_dvec(nvec, eta[j], n);
   for(i=vk[k]; i<vk[k+1]; i++) nvec[vind[0][i]] += V[i]*(bnew-B[k][j]);
@@ -72,7 +72,7 @@ void update(int j, int k, double bnew)
 
 /* lub factor */
 double calcF(int i, int j, double delta){
-  double E = denom[i] - exp(eta[j][i]);      
+  double E = denom[i] - exp(eta[j][i]); 
   double erm = exp(eta[j][i]-delta);
   double erp = exp(eta[j][i]+delta);
       
@@ -84,24 +84,25 @@ double calcF(int i, int j, double delta){
 /* draw random effects and update eta+denom */
 
 void update_rei(int i){
-  assert(RE);
+  if(!RE) error("failed assertion in update_rei");
   int j, l;
   double g, h, dbet, delta;
   delta = 0.1; // fixed trust to avoid storage
 
-  for(j=1; j<=p; j++){ 
-    g = 0.0;
-    for(l=xi[i]; l<xi[i+1]; l++) if(xind[1][l]==j){ g += -X[l]; break; }
-    g += m[i]*exp(eta[j][i] - log(denom[i])) + (U[j][i] - remean[i])/revar[i];
-    if(g == 0.0) continue;
-    h = m[i]/(calcF(i, j, delta)+2.0) + 1.0/revar[i];
-    dbet = -g/h;
-    if(fabs(dbet) < 0.0001) continue; // numerical overload otherwise
-    if(fabs(dbet) > delta) dbet = sign(dbet)*delta; 
-    U[j][i] += dbet;
-    eta[j][i] += dbet;
-    denom[i] += exp(eta[j][i]) - exp(eta[j][i]-dbet);
-  }
+  for(j=0; j<p; j++) 
+    if(p>2 | j == 1){ 
+      g = 0.0;
+      for(l=xi[i]; l<xi[i+1]; l++) if(xind[1][l]==j){ g += -X[l]; break; }
+      g += m[i]*exp(eta[j][i] - log(denom[i])) + (U[j][i] - remean[i])/revar[i];
+      if(g == 0.0) continue;
+      h = m[i]/(calcF(i, j, delta)+2.0) + 1.0/revar[i];
+      dbet = -g/h;
+      if(fabs(dbet) < 0.0001) continue; // numerical overload otherwise
+      if(fabs(dbet) > delta) dbet = sign(dbet)*delta; 
+      U[j][i] += dbet;
+      eta[j][i] += dbet;
+      denom[i] += exp(eta[j][i]) - exp(eta[j][i]-dbet);
+    }
 }
 
 
@@ -110,10 +111,9 @@ void update_rei(int i){
 void calcH(int j, int k){
   int i;
   double Hkj = 0.0;
-  assert(D[k][j] >= 0.0);
+  if(D[k][j] < 0.0) error("failed assertion in calcH");
 
-  for(i=0; i<n; i++) nvec[i] = calcF(i, j, D[k][j]);
-  for(i=vk[k]; i<vk[k+1]; i++) Hkj += V[i]*V[i]*m[vind[0][i]]/(nvec[vind[0][i]]+2.0);   
+  for(i=vk[k]; i<vk[k+1]; i++) Hkj += V[i]*V[i]*m[vind[0][i]]/(calcF(vind[0][i], j, D[k][j]*fabs(V[i]))+2.0);   
   H[k][j] = Hkj;
 }
 
@@ -126,6 +126,8 @@ double bound(double z, int j, int k, double grad)
     c = lam[k][0]*log( 1.0 + fabs(z)/lam[k][1] );
   else if(maplam[k]==0) 
     c = lam[k][0]*fabs(z);
+  else if(maplam[k]==2)
+    c = z*z*0.5*lam[k][1];
 
   return grad*(z-B[k][j]) + 0.5*(z-B[k][j])*(z-B[k][j])*H[k][j] + c;
 }
@@ -163,12 +165,10 @@ double Bmove(int j, int k, double grad, double sgn)
   double dbet;
   if(maplam[k]<0) error("mnlogit is trying to solve for fixed coeficients.  Please report this bug.");
   if(H[k][j] == 0.0) return -B[k][j]; // happens only if you have all zero predictors
-
-  if(lam[k][0]==0){ // unpenalized (e.g. intercept) parameters
-    dbet = -grad/H[k][j]; 
-  }
-  else if(maplam[k]==0){ // update with fixed lambda 
-    if(sgn != 0.0)
+  
+  if(maplam[k]==0){ // lasso update 
+    if(lam[k][0]==0){ dbet = -grad/H[k][j]; } // unpenalized update
+    else if(sgn != 0.0)
       { dbet = -(grad+sgn*lam[k][0])/H[k][j]; 
 	if(sgn != sign(B[k][j]+dbet)) dbet = -B[k][j]; }
     else{ // check both sides
@@ -178,15 +178,18 @@ double Bmove(int j, int k, double grad, double sgn)
 	{ dbet = -(grad - lam[k][0])/H[k][j];
 	  if( !(bound(B[k][j] + dbet, j, k, grad) < obj) ) dbet = 0.0; } }
   }
-  else{ // lambda/beta update
+  else if(maplam[k]==1){ // gamma-lasso update
     if(sgn != 0.0) dbet = findroot(j, k, grad, sgn) - B[k][j];
     else{  // check both sides
       if(B[k][j] != 0.0) error("accounting error in mnlogit -> Bmove.  Please report this bug.");
       double sln = findroot(j, k, grad, +1.0);
       if(sln == 0.0) sln = findroot(j, k, grad, -1.0);
       dbet = sln - B[k][j]; }
-  }      
-
+  }
+  else{ // ridge update
+    if(maplam[k]!=2 | lam[k][0]!=0.0) error("bad maplam or lam in Bmove.  Please report this bug.");
+    dbet = -(grad + B[k][j]*lam[k][1])/(H[k][j] + lam[k][1]);
+  }
   if(fabs(dbet) > D[k][j]) dbet = sign(dbet)*D[k][j]; // trust region bounds 
   return dbet;
 }
@@ -220,10 +223,9 @@ void mnlm_cleanup(){
 /* 
  * Main Function: Rmnlogit
  *
- * Cyclic coordinate descent for m.a.p. estimation of multinomial
- * logistic regression coefficients under a laplace prior.  
+ * Cyclic coordinate descent for m.a.p. estimation of 
+ * multinomial logistic regression coefficients 
  *
- * Assumes that the first column of V is the (unpenalized) intercept
  *
  */
 
@@ -262,44 +264,44 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
   vind = new_imat_fromv(Nv, 2, vind_in);
   vk = new_dup_ivec(vk_in, d+1); 
 
-  H = new_zero_mat(p+1, d);  
-  D = new_mat(p+1, d);
-  for(j=0; j<=p; j++) for(k=0; k<d; k++) D[k][j] = dinit[0]; 
+  H = new_zero_mat(p, d);  
+  D = new_mat(p, d);
+  for(j=0; j<p; j++) for(k=0; k<d; k++) D[k][j] = dinit[0]; 
 
   maplam = new_dup_ivec(maplam_in, d);
   lam = new_mat_fromv(2, d, lam_in);
   
-  B = new_mat_fromv(p+1, d, beta_vec);
+  B = new_mat_fromv(p, d, beta_vec);
 
   RE = *RE_in;
   if(RE){
     xi = new_dup_ivec(xi_in, n+1); 
     remean = new_dup_dvec(randeff, n);
     revar = new_dup_dvec(&randeff[n], n);
-    U = new_mat(n,p+1);
-    zero_dvec(U[0], n);
-    for(j=1; j<=p; j++) copy_dvec(U[j], remean, n);
-    eta = new_dup_mat(n, p+1, U);
-  } else{ eta = new_zero_mat(n, p+1); }
+    U = new_mat(n,p);
+    if(p==2) zero_dvec(U[0], n);
+    for(j=0; j<p; j++) if(p>2 | j == 1) copy_dvec(U[j], remean, n);
+    eta = new_dup_mat(n, p, U);
+  } else{ eta = new_zero_mat(n, p); }
   
-  for(j=0; j<=p; j++) for(i=0; i<Nv; i++) eta[j][vind[0][i]] += V[i]*B[vind[1][i]][j];
+  for(j=0; j<p; j++) for(i=0; i<Nv; i++) eta[j][vind[0][i]] += V[i]*B[vind[1][i]][j];
   denom = new_dzero(n);
-  for(i=0; i<n; i++) for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); // includes 1.0 for null category
-  if(eta[0][0]!=0.0) myprintf(mystdout, "You've input nonzero null category betas; these are not updated.\n");
+  for(i=0; i<n; i++) for(j=0; j<p; j++) denom[i] += exp(eta[j][i]); 
+  if(p==2 & eta[0][0]!=0.0) myprintf(mystdout, "You've input nonzero null category betas; these are not updated.\n");
 
-  G = new_mat_fromv(p+1, d, Gout);
+  G = new_mat_fromv(p, d, Gout);
 
   Lnew = neglogpost();
   if(isinf(Lnew) || isnan(Lnew)){  
     warning(" Infinite or NaN initial fit; starting at zero instead.  \n  Try `normalize=TRUE' or a larger penalty shape or rate.\n");
-    for(j=0; j<=p; j++) for(k=0; k<d; k++) B[k][j] = 0.0;
+    for(j=0; j<p; j++) for(k=0; k<d; k++) B[k][j] = 0.0;
     if(RE){
-      copy_mat(n, p+1, eta, U);
+      copy_mat(n, p, eta, U);
       zero_dvec(denom, n);
-      for(i=0; i<n; i++) for(j=0; j<=p; j++) denom[i] += exp(eta[j][i]); }
+      for(i=0; i<n; i++) for(j=0; j<p; j++) denom[i] += exp(eta[j][i]); }
     else{
-      zero_mat(eta, n, p+1);
-      for(i=0; i<n; i++) denom[i] = ((double) p) + 1.0; }
+      zero_mat(eta, n, p);
+      for(i=0; i<n; i++) denom[i] = ((double) p); }
     Lnew  = neglogpost(); 
     if(isinf(Lnew) || isnan(Lnew)){
       warning(" Probabilities of exactly zero in your likelihood.  \n   You need to use a larger penalty.\n");
@@ -327,9 +329,9 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
     nregpar = 0.0;
 
     // loop through coefficient
-    for(j=1; j<=p; j++)
+    for(j=0; j<p; j++)
       for(k=0; k<d; k++)
-	if(maplam[k]>=0){ 
+	if(maplam[k]>=0 & (p>2 | j == 1)){ 
 	  if(B[k][j] != 0.0 || dozero || lam[k][0]==0 || t < 3 || runif(0,1) < 0.1){
 	    // gradient
 	    grad = G[k][j];
@@ -374,7 +376,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
     if(diff < 0.0){
       i = 0;
       for(k=0; k<d; k++)
-	if(maplam[k]==1)
+	if(maplam[k]>0)
 	  { lam[k][0] *= 2.0;
 	    lam[k][1] *= 2.0; 
 	    i++; }
@@ -398,8 +400,8 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
   }
   
   /* clean, collect, and exit */
-  for(j=0; j<=p; j++) for(k=0; k<d; k++) beta_vec[k*(p+1) + j] = B[k][j];  // beta fit
-  for(i=0; i<Nx; i++) fitted[i] = exp(eta[xind[1][i]][xind[0][i]] - log(denom[xind[0][i]] - 1.0*((double) p > 1))); // exclude null for > 2 cat
+  for(j=0; j<p; j++) for(k=0; k<d; k++) beta_vec[k*p + j] = B[k][j];  // beta fit
+  for(i=0; i<Nx; i++) fitted[i] = exp(eta[xind[1][i]][xind[0][i]] - log(denom[xind[0][i]])); 
   mnlm_cleanup(); // clean 
   dirty = 0;  // declare normal exit
 }

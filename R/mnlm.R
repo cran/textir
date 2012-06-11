@@ -8,16 +8,19 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
   on.exit(.C("mnlm_cleanup", PACKAGE = "textir"))
   
   ## check and possibly bin observations for fast inference
-  checked <- mncheck(counts=counts, covars=covars, normalize=normalize, bins=bins, verb=verb, ...)
+  checked <- mncheck(counts=counts, covars=covars, normalize=normalize, bins=bins, penalty=penalty, verb=verb, ...)
   X <- checked$X # stm; adds a null column onto X if ncol(X) > 2
   V <- checked$V # stm; adds an intercept onto the covariates
 
   counts = checked$counts # simple triplet form
+  never = checked$never
+  fullnames = checked$fullnames
   covars = checked$covars # possibly normalized
   covarMean = checked$covarMean
   covarSD = checked$covarSD
+  prior = checked$prior
   
-  p <- ncol(X)-1  
+  p <- ncol(X)  
   n <- nrow(X)
   m <- row_sums(X)
   d <- ncol(V)
@@ -29,17 +32,24 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
     phi <- NULL
     if(d >= 50){ phi <- matrix(0, nrow=p, ncol=d-1) }
     else{
-      if(p<=10000){ phi <- suppressWarnings(try(corr(F[,-1],as.matrix(V[,-1])), silent=TRUE)) }
+      if(p<=10000){ phi <- suppressWarnings(try(corr(F,as.matrix(V[,-1])), silent=TRUE))
+                    phi[is.nan(phi)] <- 0 }
       if(p > 10000 || class(phi)=="try-error"){
-        phi <- tcrossprod_simple_triplet_matrix(t(F[,-1]),t(as.matrix(V)[,-1,drop=FALSE]))
+        phi <- tcrossprod_simple_triplet_matrix(t(F),t(as.matrix(V)[,-1,drop=FALSE]))
       }
     }
     q <- col_means(F)
-    start <- cbind( log(q[-1])-log(max(q[1],0.0001)), phi)
+    start <- cbind( log(q)-log(mean(q)), phi )
     if(verb){ cat("done.\n") }
   }
-  else{ if(nrow(start) != p || ncol(start) != d) stop("bad starting coefficient matrix") }
-  coef <- rbind(rep(0,d), start)
+  else{
+    if(ncol(start) != length(fullnames) || nrow(start) != d) stop("bad starting coefficient matrix")
+    start <- t(start) ## transpose to match coef
+    start[is.nan(start)] <- 0
+    if(any(never)) start <- start[!never,] 
+  }
+  coef <- start
+  if(p==2) coef[1,] <- rep(0,ncol(coef))
 
   if(d>p) G <- t(-tcrossprod_simple_triplet_matrix(t(V), as.matrix(t(X))))
   else G <- -tcrossprod_simple_triplet_matrix(t(X), as.matrix(t(V)))
@@ -53,8 +63,7 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
   }
   else{ revec <- rev <- rem <- xi <- NULL }
 
-  prior = buildprior(penalty, d, verb)
-  
+    
   map <- .C("Rmnlogit",
             n = as.integer(n),
             p = as.integer(p),
@@ -80,50 +89,53 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
             revec = as.double(revec),
             verb = as.integer(verb),
             PACKAGE="textir")
-            
-
-  ## drop the null category and format output
+  
+  ## format output
   coef <- matrix(map$coef, ncol=d)
   map$fitted[is.nan(map$fitted)|!is.finite(map$fitted)|is.na(map$fitted)] <- 1/ncol(X)
-  
-  if(ncol(X)>2){
-    if(sum(X[,1])>0){ m <- m-X[,1]$v }
-    xhat <- simple_triplet_matrix(i=X$i, j=X$j, v=map$fitted*m[X$i], dimnames=dimnames(X))[,-1]
-    X <- X[,-1]
-    intercept <- matrix(coef[-1,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]],"intercept"))
-    loadings <- matrix(coef[-1,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]], covariate=dimnames(covars)[[2]]))
-  } else{
+  if(p==2){
     xhat <- as.matrix(simple_triplet_matrix(i=X$i, j=X$j, v=map$fitted, dimnames=dimnames(X)))
     xhat[xhat[,2]==0,2] <- 1 - xhat[xhat[,2]==0,1]
     xhat <- xhat[,2] 
     intercept <- matrix(coef[-1,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]][-1],"intercept"))
-    loadings <- matrix(coef[-1,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]][-1], covariate=dimnames(covars)[[2]]))
-    p <- p+1 }
+    loadings <- matrix(coef[-1,-1], nrow=1, dimnames=list(category=dimnames(counts)[[2]][-1], covariate=dimnames(covars)[[2]])) }
+  else{
+    xhat <- simple_triplet_matrix(i=X$i, j=X$j, v=map$fitted*m[X$i], dimnames=dimnames(X))
+    intercept <- matrix(coef[,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]],"intercept"))
+    loadings <- matrix(coef[,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]], covariate=dimnames(covars)[[2]])) }
+  loadings <- as.simple_triplet_matrix(loadings)
 
   ## clean un-needed summaries
   if(bins==0){ X=NULL; V=NULL; }
 
   ## calculate the estimated penalties 
   rateincrease = 2.0^map$lampar[1]
-  if(rateincrease > 1){ cat(sprintf("WARNING: Prior shape and rate were multiplied by %g in order to get convergence.\n", rateincrease)) }
-  lambda = abs(loadings)
-  if(is.list(penalty)){
-    for(k in 2:d){
-      if(length(penalty[[k]])>1){ penalty[[k]] <- penalty[[k]]*rateincrease
-                                  lambda[,k-1] <- penalty[[k]][1]/(penalty[[k]][2] + lambda[,k-1]) }
-      else{ lambda[,k-1] <- penalty[[k]] } } }
-  else{
-    if(length(penalty)>1){ penalty = penalty*rateincrease
-                           lambda <- penalty[1]/(penalty[2] + lambda) }
-    else{ lambda <- penalty } }
+  if(rateincrease > 1){ cat(sprintf("WARNING: Prior parameters were multiplied by %g in order to get convergence.\n", rateincrease)) }
+
+  ## deal with never observed categories
+  if(any(never)){
+    loadings <- simple_triplet_matrix(i=match(dimnames(loadings)[[1]][loadings$i],fullnames),
+                                      j=loadings$j, v = loadings$v, nrow=length(fullnames),
+                                      dimnames=list(category=fullnames, covariate=dimnames(loadings)[[2]]))
+    fullalpha <- rep(log(1/(10+sum(counts))),length(fullnames))
+    fullalpha[!never] <- intercept
+    intercept <- matrix(fullalpha, ncol=1, dimnames=list(category=fullnames,"intercept"))
+    counts <- simple_triplet_matrix(i=counts$i, j=match(dimnames(counts)[[2]][counts$j],fullnames), v=counts$v,
+                                    ncol=length(fullnames), dimnames=list(dimnames(counts)[[1]],fullnames))
+    xhat <- simple_triplet_matrix(i=xhat$i, j=match(dimnames(xhat)[[2]][xhat$j],fullnames), v=xhat$v,
+                                    ncol=length(fullnames), dimnames=list(I=dimnames(xhat)[[1]],cat=fullnames))
+    if(!is.null(X)){
+      X <- simple_triplet_matrix(i=X$i, j=match(dimnames(X)[[2]][X$j],fullnames), v=X$v,
+                                 ncol=length(fullnames), dimnames=list(I=dimnames(X)[[1]],cat=fullnames)) }
+  }
+    
 
   ## construct the return object
   out <- list(intercept=intercept, loadings=loadings,
               X=X, counts=counts, V=V, covars=covars, 
               normalized=normalize, binned=bins>0,
               covarMean=covarMean, covarSD=covarSD, 
-              prior=penalty, lambda=lambda,
-              fitted=xhat)
+              prior=penalty, fitted=xhat)
   
   ## class and return
   class(out) <- "mnlm"
@@ -131,9 +143,32 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
 }
 
 ## s3 plot method for mnlm
-plot.mnlm<- function(x, type=c("response","reduction"), covar=NULL, v=NULL, xlab=NULL, ylab=NULL, col=NULL, ...)
+plot.mnlm<- function(x, type=c("response","reduction","roc"), covar=NULL, v=NULL, xlab=NULL, ylab=NULL, col=NULL, ...)
 {
-  if(type[1]=="reduction"){
+  if(type[1]=="roc"){
+    if(max(x$counts$v) > 1) stop("ROC curves are provided only for max(count)=1 classification data")
+    
+    pred <- predict(x, newdata=x$covars)
+    if(is.null(col) || length(col) != ncol(pred)) col = rainbow(ncol(pred))
+    if(is.null(xlab)) xlab = "1-Specificity"
+    if(is.null(ylab)) ylab = "Sensitivity"
+    
+    roc <- function(y,p,add,lc, ...){
+      Q <- p > matrix(rep(sort(p),length(p)),ncol=length(p),byrow=TRUE)
+      fp <- colSums((y==levels(y)[1])*Q)/sum(y==levels(y)[1])
+      tp <- colSums((y==levels(y)[2])*Q)/sum(y==levels(y)[2])
+      if(!add) plot(fp, tp, type="l", xlab=xlab, ylab=ylab, col=lc, ...)
+      else lines(fp, tp, col=lc) }
+    
+    if(ncol(pred)==1) y <- factor(as.matrix(x$counts[,2])[,1]>0) 
+    else  y <- factor(as.matrix(x$counts[,1])[,1]>0) 
+    roc(y, pred[,1], FALSE, col[1], ...)
+    abline(a=0,b=1,lty=2,col=8)
+    if(ncol(pred)>1){
+      for(j in 2:ncol(pred)) roc( factor(as.matrix(x$counts[,j])[,1]>0), pred[,j], TRUE, col[j], ...)         
+    }
+  }
+  else if(type[1]=="reduction"){
     if(ncol(x$counts)<=2){
       cat("No useful sufficient reductions for a binary response.  Use type=`repsonse' instead.\n") 
       return(invisible()); }
@@ -143,8 +178,8 @@ plot.mnlm<- function(x, type=c("response","reduction"), covar=NULL, v=NULL, xlab
     
     X <- as.simple_triplet_matrix(x$counts)
     frq <- freq(X)
-    if(inherits(frq,"simple_triplet_matrix")){ z <- tcrossprod_simple_triplet_matrix(frq, t(x$loadings[,covar])) }
-    else{ z <- frq%*%x$loadings[,covar] }
+    if(inherits(frq,"simple_triplet_matrix")){ z <- tcrossprod_simple_triplet_matrix(frq, t(as.matrix(x$loadings[,covar]))) }
+    else{ z <- frq%*%as.matrix(x$loadings[,covar]) }
     
     if(is.null(v) || length(v)!=nrow(X)){
       if(is.null(xlab)){ xlab <- paste("covariate ",covar) }
@@ -179,17 +214,24 @@ plot.mnlm<- function(x, type=c("response","reduction"), covar=NULL, v=NULL, xlab
         if(is.null(ylab)){ ylab <- "fitted count" }
         if(x$binned){ counts <- factor(x$X$v) }
         else{ counts <- factor(x$counts$v) }
-        isfull <- counts%in%levels(counts)[table(counts)>=5]
         if(is.null(col)){ col=rainbow(nlevels(counts)) }
         numcnt <- as.numeric(levels(counts))
         plot(x$fitted$v ~ counts, at=numcnt, xlab=xlab, ylab=ylab, col=col, varwidth=TRUE, xlim=range(numcnt)+c(-.25,.25), ... )    
-        points(as.numeric(as.character(counts[!isfull])), x$fitted$v[!isfull])
       }
     }
   }
 }
 
- ## S3 method predict function
+## S3 method coef function
+coef.mnlm <- function(object, origscale=TRUE, ...){
+  if(origscale && !is.null(object$covarSD)){
+    object$loadings$v = object$loadings$v/object$covarSD[object$loadings$j]
+    object$intercept <- object$intercept - col_sums(object$covarMean*t(object$loadings))
+  } 
+  return( as.matrix(t(cbind(object$intercept, object$loadings))) )
+}
+                         
+## S3 method predict function
 predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
 {
   if(type[1]=="reduction"){
@@ -201,7 +243,7 @@ predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
     
     if(class(object)!="mnlm"){ stop("object class must be `mnlm'.") }
     
-    phi <- object$loadings
+    phi <- as.matrix(object$loadings)
     if(nrow(phi) != ncol(F)){ stop("Dimension mismatch: nrow(phi) != ncol(X)") }
     
     return(tcrossprod_simple_triplet_matrix(F, t(phi)))
@@ -212,7 +254,8 @@ predict.mnlm <- function(object, newdata, type=c("response","reduction"), ...)
     if(ncol(newdata)!=ncol(object$loadings)){ stop("newdata must be a matrix with the same columns as object$covars") }
     newdata <- as.simple_triplet_matrix(newdata)
 
-    expeta <- exp(tcrossprod_simple_triplet_matrix(cbind(rep(1,nrow(newdata)),newdata),cbind(object$intercept,object$loadings)))
+    expeta <- exp(tcrossprod_simple_triplet_matrix(cbind(rep(1,nrow(newdata)),newdata),
+                                                   cbind(object$intercept,as.matrix(object$loadings))))
     expeta[!is.finite(expeta)] <- max(expeta[is.finite(expeta)])
     if(ncol(expeta)==1){ P <- expeta/(1+expeta) }
     else{ P <- expeta/row_sums(expeta) }
@@ -227,7 +270,7 @@ summary.mnlm <- function(object, y=NULL, ...){
 
   print(object)
 
-  ps <- round(100*sum(object$loadings==0)/length(object$loadings),1) 
+  ps <- round(100*sum(object$loadings==0)/(nrow(object$loadings)*ncol(object$loadings)),1) 
   cat(paste("   Loadings matrix is ",
             ps, "% sparse.\n\n", sep=""))
   
@@ -250,15 +293,13 @@ summary.mnlm <- function(object, y=NULL, ...){
   }
   else if(is.null(object$X)){
     if(is.vector(object$fitted)){
-      cat(paste("   False positives and negatives:\n "))
       cuts <- c(.1,.25,.5,.75,.9)
-      F <- matrix(nrow=2,ncol=5, dimnames=list(c("    %fp","    %fn"),
+      F <- matrix(nrow=2,ncol=5, dimnames=list(c("sensitivity %","specificity %"),
                                    " classification cut-off" = cuts)) 
       for(i in 1:5){
-        p <- object$fitted >= cuts[i];
-        q <- object$fitted < cuts[i];
-        F[1,i] <- sum( as.matrix(object$counts)[p,1])/sum(p)
-        F[2,i] <- sum( as.matrix(object$counts)[q,2])/sum(q) }
+        q <- object$fitted >= cuts[i];
+        F[1,i] <- sum(as.matrix(object$counts)[q,2])/sum(as.matrix(object$counts)[,2])
+        F[2,i] <- sum(as.matrix(object$counts)[!q,1])/sum(as.matrix(object$counts)[,1]) }
       F[is.na(F)] <- 0
       print(round(F*100,1))
       cat("\n")
@@ -336,7 +377,7 @@ cubic <- function(a, b, c, quiet=FALSE, plot=FALSE)
 #######  Undocumented "mnlm"-related utility functions #########
 
 ## check the inputs and bin
-mncheck <- function(counts, covars, normalize, bins, verb, delta=1, dmin=0.01, nullfactor=0, randeffects=FALSE){
+mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmin=0.01, randeffects=FALSE){
 
   ## check counts (can be an object from tm, slam, or a simple co-occurance matrix or a factor)
   if(is.null(dim(counts))){ 
@@ -346,35 +387,34 @@ mncheck <- function(counts, covars, normalize, bins, verb, delta=1, dmin=0.01, n
   if(inherits(counts, "TermDocumentMatrix")){ counts <- t(counts) }
   counts <- as.simple_triplet_matrix(counts)
 
+  ## deal with never observed categories
+  fullnames <- dimnames(counts)[[2]]
+  never <- sdev(counts)==0
+  counts <- counts[,!never]
+  
   ## covariates input and check
   if(nrow(counts) != nrow(as.matrix(covars))){ stop("different number of predictor and response rows") }
   if(is.null(dim(covars))){
     covars <- matrix(covars, dimnames=list(dimnames(counts)[[1]], deparse(substitute(covars)))) }
+  if(is.data.frame(covars)){ covars <- sapply(covars,as.numeric) }
   
   ## standardize for mean 0 variance 1.
-  covarMean <- covarSD <- NULL
+  covarMean <- NULL
+  covarSD <- sdev(covars)
   if(normalize)
     {
       if(is.simple_triplet_matrix(covars)){ covarMean <- 0 }
       else{
         covars <- as.matrix(covars)
         covarMean <- colMeans(covars) }
-      
-      covarSD <- sdev(covars)
-      if(any(covarSD==0)){ warning("You have a column of 'covars' with sd=0; do not include an intercept term.")
-                           covarSD[covarSD==0] <- 1  }
       covars <- normalize(covars, m=covarMean, s=covarSD)
     }
 
-  ## bin, add the null category, and organize V
+  ## bin and organize V
   X <- counts
   V <- covars
 
-
-  if(nullfactor < 0){ stop("You need a positive nullfactor") }
-
   if(bins<=1){  
-    if(ncol(X)>2){ X <- cbind(as.vector(row_sums(X)*nullfactor), X) }
     X <- X
     V <- cbind(rep(1,nrow(V)),V)
     N <- rep(1,nrow(V))
@@ -404,13 +444,11 @@ mncheck <- function(counts, covars, normalize, bins, verb, delta=1, dmin=0.01, n
     vals <- tapply(X$v, xij, sum) 
     ij <- matrix(as.numeric(unlist(strsplit(names(vals), split="\\."))), ncol=2, byrow=TRUE)
     Xs <- simple_triplet_matrix(i=ij[,1], j=ij[,2], v=vals, dimnames=list(I=dimnames(Vm)[[1]], cat=dimnames(X)[[2]]))
-    if(ncol(Xs)>2){ Xs <- cbind(as.vector(row_sums(Xs)*nullfactor),Xs) } 
 
     if(verb){
       cat("\nResponse Bins: \n")
       print(Vm)
       cat("\n") }
-
 
     X = Xs
     V = cbind(1,Vm)
@@ -434,51 +472,55 @@ mncheck <- function(counts, covars, normalize, bins, verb, delta=1, dmin=0.01, n
     X$j <- X$j[o]
     X$v <- X$v[o] }
 
-  return( list(counts=counts, covars=covars, covarMean=covarMean, covarSD=covarSD, X=X, V=V, I=I, N=N, delta=delta, dmin=dmin, RE=randeffects) )
+  ## build prior
+  prior <- buildprior(penalty, ncol(V), ncol(X), verb=verb, fix=c(FALSE, covarSD==0))
+  if(!normalize) covarSD <- NULL
+
+  return( list(counts=counts, covars=covars, covarMean=covarMean, covarSD=covarSD, fullnames=fullnames, never=never,
+               prior=prior, X=X, V=V, I=I, N=N, delta=delta, dmin=dmin, RE=randeffects) )
 
 }
 
 ## build the penalties
-buildprior <- function(penalty, d, verb=0){
-  if(is.list(penalty)){
+buildprior <- function(penalty, d, p, verb=0, fix){
+  if(!is.list(penalty)){
+    penlist <- vector(mode='list', length=d)
+    if(p==2){ penlist[[1]] <- c(0,0) } # unpenalized
+    else{ penlist[[1]] <- c(0,1) }# Norm(0,1) on the intercept
+    penlist[2:d] <- rep(data.frame(penalty),d-1) 
+  } else{
     if(length(penalty) != d){ stop("bad penalty argument") }
-    maplam = c()
-    lampar = c()
-    for(i in 1:d){
-      if(length(penalty[[i]]) == 1){
-        if(penalty[[i]] < 0){
-          maplam = c(maplam,-1)
-          lampar = c(lampar, c(0,0))
-          if(verb && d<10) cat(sprintf("Coefficients taken as given for column %d\n", i-1))
-        }
-        else{
-          maplam = c(maplam,0)
-          lampar = c(lampar, c(penalty[[i]], 0))
-          if(verb && d<10) cat(sprintf("Fixed L1 penalty at %g for column %d\n", penalty[[i]], i-1))
-        }
-      }
-      else if(length(penalty[[i]]) == 2){
-        if(any(penalty[[i]]<=0)) stop("Gamma hyperprior requires parameters > 0")
-        maplam = c(maplam,1)
-        lampar = c(lampar, c(penalty[[i]][1], penalty[[i]][2]))
-        if(verb && d<10) cat(sprintf("Gamma(%g,%g) prior on penalties for column %d\n", penalty[[i]][1], penalty[[i]][2], i-1))
-      }
-      else{ stop("bad lambda argument within your penalty list") }
-    }
+    penlist <- penalty
   }
-  else{
-    if(length(penalty)==1){
-      maplam <- rep(0,d)
-      lampar <- c(c(0,0),rep(c(penalty,0),d-1)) 
-      if(verb) cat(sprintf("Fixed L1 penalty of %g.\n", penalty))
+  maplam = c()
+  lampar = c()
+  printem <- verb && d<5
+
+  for(i in 1:d){
+    if(length(penlist[[i]]) == 1) penlist[[i]] <- c(penlist[[i]],0)
+    if(fix[i]) penlist[[i]] <- c(-1,0)
+    if(length(penlist[[i]]) == 2){
+      if(any(penlist[[i]]<0)){ ## fixed coef
+        maplam = c(maplam,-1)
+        lampar = c(lampar, c(0,0))
+        if(printem) cat(sprintf("fixed coefficients for column %d\n", i-1)) }
+      else if(penlist[[i]][2]==0){ ## L1 penalty
+        maplam = c(maplam,0)
+        lampar = c(lampar, penlist[[i]])
+        if(printem){
+          if(penlist[[i]][1]==0) cat(sprintf("No prior penalty for column %d\n", i-1))
+          else cat(sprintf("laplace(%g) prior for column %d\n", penlist[[i]][1], i-1)) } }
+      else if(penlist[[i]][1]==0){ ## L2 penalty
+        maplam = c(maplam,2)
+        lampar = c(lampar, penlist[[i]])
+        if(printem) cat(sprintf("normal(0,%g) prior for column %d\n", 1/penlist[[i]][2], i-1)) }
+      else{ ## gamma lasso penalty
+        maplam = c(maplam,1)
+        lampar = c(lampar, penlist[[i]])
+        if(printem) cat(sprintf("gamma(%g,%g)-lasso prior for column %d\n",
+                                penlist[[i]][1], penlist[[i]][2], i-1)) }
     }
-    else if(length(penalty)==2){
-      if(any(penalty<=0)) stop("Gamma hyperprior requires parameters > 0")
-      maplam = c(0,rep(1,d-1))
-      lampar = c(c(0,0), rep(c(penalty[1], penalty[2]),d-1))
-      if(verb) cat(sprintf("Gamma(%g,%g) prior on penalties.\n", penalty[1], penalty[2]))
-    }
-    else{ stop("bad lambda argument: length(penalty) > 2") }
+    else{ stop("bad argument length within your penalty list") }
   }
   return(list(maplam=maplam, lampar=lampar)) }
   

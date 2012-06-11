@@ -18,6 +18,8 @@ export(corr,
        expit,
        logit)
 
+S3method(coef,mnlm)
+S3method(print,mnlm)
 S3method(plot,mnlm)
 S3method(predict,mnlm)
 S3method(summary,mnlm)

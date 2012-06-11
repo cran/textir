@@ -57,7 +57,7 @@ on output this is a single value corresponding to the model with the highest Bay
 \item{X}{The input count matrix, in \code{simple_triplet_matrix} format.}
 }
 \references{
-Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
 \url{http://arxiv.org/abs/1109.4518}
 }
 \author{

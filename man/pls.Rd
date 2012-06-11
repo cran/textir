@@ -27,7 +27,7 @@
 	at \code{normalize(as.numeric(y))} and subsequent factors are orthogonal 
 	to the k'th pls direction, \code{directions[,k]=X\%*\%loadings[,k]}. }
 \references{
-Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
+Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
 \url{http://arxiv.org/abs/1012.2098}
 
 Wold, H. (1975), \emph{Soft modeling by latent variables: The nonlinear iterative partial least squares approach}. 

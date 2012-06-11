@@ -1,3 +1,2 @@
-# Uncomment -fopenmp and -lgomp to get openMP parallelization with gcc >= 4.2. 
-PKG_CFLAGS = -DRPRINT -DNDEBUG #-fopenmp
-PKG_LIBS =  ${LAPACK_LIBS} ${BLAS_LIBS} ${FLIBS} #-lgomp
+PKG_CFLAGS = -DRPRINT ${SHLIB_OPENMP_CFLAGS}
+PKG_LIBS =  ${LAPACK_LIBS} ${BLAS_LIBS} ${FLIBS} ${SHLIB_OPENMP_CFLAGS}

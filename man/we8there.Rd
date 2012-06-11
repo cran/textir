@@ -18,10 +18,10 @@ Counts for 2804 bigrams in 6175 restaurant reviews from the site www.we8there.co
 \references{ 
 Maua, D.D. and Cozman, F.G. (2009), \emph{Representing and classifying user reviews}. In ENIA '09: VIII Enconro Nacional de Inteligencia Artificial, Brazil.
 
-Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
+Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
 \url{http://arxiv.org/abs/1012.2098}
 
-Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
 \url{http://arxiv.org/abs/1109.4518}
 
 }

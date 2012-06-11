@@ -42,6 +42,7 @@ sdev <- function(x){
 
 ##  normalizing design matrices
 normalize <- function(x, m=NULL, s=NULL, undo=FALSE){
+  if(!is.null(s)){ s[s==0] <- 1 }
   if(!is.null(m)){
     if(is.simple_triplet_matrix(x) && m == 0){
       if(!undo) x$v <- x$v/s[x$j]
@@ -51,7 +52,8 @@ normalize <- function(x, m=NULL, s=NULL, undo=FALSE){
   x <- as.matrix(x)
   if(!undo){
     if(is.null(m)){ m <- apply(x,2,mean) }
-    if(is.null(s)){ s <- apply(x,2,sd) }
+    if(is.null(s)){ s <- apply(x,2,sd)
+                    s[s==0] <- 1}
     return( t((t(x) - m)/s) ) }
   else{
     if(is.null(m) || is.null(s)){ stop("can't un-normalize without mean and sd.") }

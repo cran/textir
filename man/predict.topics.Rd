@@ -20,7 +20,7 @@ Estimates for each new \eqn{\omega_i} are, conditional on \code{object$theta},
 MAP in the (K-1)-dimensional logit transformed parameter space.  }
 \value{ The output is an \code{nrow(newcounts)} by \code{object$K} matrix of document topic weights, or a list with including these weights as \code{W} and the log likelihood as \code{L}. }
 \references{
-Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
 \url{http://arxiv.org/abs/1109.4518}
 }
 \author{

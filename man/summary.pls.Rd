@@ -17,7 +17,7 @@ pls summary
 \value{ A printout of the number of pls directions and the input dimension, followed by a summary of the 
 	corresponding forward regression \code{lm(as.numeric(y)~directions)}.  }
 \references{
-Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
+Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
 \url{http://arxiv.org/abs/1012.2098}
 }
 \author{

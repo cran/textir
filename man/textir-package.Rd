@@ -12,10 +12,10 @@ Matt Taddy \email{taddy@chicagobooth.edu}
  \references{
 \url{http://faculty.chicagobooth.edu/matt.taddy/index.html}
 
-Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
+Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
 \url{http://arxiv.org/abs/1012.2098}
 
-Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
 \url{http://arxiv.org/abs/1109.4518}
 
 }

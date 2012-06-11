@@ -35,7 +35,7 @@ outside of the plot region at which the legend is centered. }
 
 \value{ A fabulous plot. }
 \references{
-Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
 \url{http://arxiv.org/abs/1109.4518}
 }
 \author{

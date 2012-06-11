@@ -29,10 +29,10 @@ parsing and sentiment details are in Taddy (2011; Section 2.1). }
 \references{ 
 Gentzkow, M. and J. Shapiro (2010), \emph{What drives media slant? Evidence from U.S. daily newspapers}. Econometrica 78, 35-7.  The full dataset is at \url{http://dx.doi.org/10.3886/ICPSR26242}.
 
-Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
+Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
 \url{http://arxiv.org/abs/1012.2098}
 
-Taddy (2011), \emph{Estimation and Selection for Topic Models}.
+Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
 \url{http://arxiv.org/abs/1109.4518}
 
 }

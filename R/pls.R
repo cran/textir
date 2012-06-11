@@ -74,7 +74,7 @@ print.pls <- function(x, ...){
   cat(paste("\nA pls(", ncol(x$directions), ") object, reduced from ", ncol(x$X), " input variables. \n\n", sep="")) }
 
  ## S3 method predict function
-predict.pls <- function(object, newdata, response=TRUE, ...)
+predict.pls <- function(object, newdata, type="response", ...)
 {
   if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
   if(!is.null(object$scale)){
@@ -84,7 +84,7 @@ predict.pls <- function(object, newdata, response=TRUE, ...)
   if(inherits(newdata, "simple_triplet_matrix")){
     z <- tcrossprod_simple_triplet_matrix(newdata, t(object$loadings))
     } else { z <- newdata%*%object$loadings }
-  if(response){
+  if(type=="response"){
     fitted <- cbind(1,z)%*%object$fwdmod$coef
     return(fitted)
   } else{  return(z) }

@@ -16,8 +16,8 @@
 }
 
 \references{ 
-Taddy (2011), \emph{Inverse Regression for Analysis of Sentiment in Text}.
-\url{http://arxiv.org/abs/1012.2098}
+Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
+\url{http://arxiv.org/abs/1109.4518}
 }
 
 \author{ 
