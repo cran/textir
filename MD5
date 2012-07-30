@@ -1,12 +1,12 @@
-f9fee01d270d9bb3f97d070188e461a3 *ChangeLog
-e1e5b6e5252536138fc0d507ba5f7ebe *DESCRIPTION
+29e0f3da9c375c5ad8e218c5bda41f04 *ChangeLog
+884e73fe8d94e9f14e8af530a8ad22a0 *DESCRIPTION
 276c717e610b11e9d9601597c4cd0cae *LICENSE
 dbe906e0f88586401163942a3d4b44c9 *NAMESPACE
 3046c838eb6fd043339b756b8c84c73c *R/count.R
-80fb09e4d058b14cea153f9ebbec1d11 *R/mnlm.R
+a1b9037f6c27384c42013626c2fa63b0 *R/mnlm.R
 83fb2eef29fbeecc7f284c4fbe62a084 *R/pls.R
 87462f9682f2a35eb197d94acf645186 *R/topics.R
-694da5703e9406888a2ecba555c68eca *R/tpx.R
+b37bea6ee984c3a3b3829eac671d7324 *R/tpx.R
 523865fb9adc6506887504b98f2639a0 *data/congress109.rda
 a4aca1ededafcf6589011132b5a8bdc6 *data/we8there.rda
 74e1344b1c95eca763a25267ebd4370a *data/wsjibm.rda
@@ -39,7 +39,7 @@ bc980b050d6d7fc06b7db0d5ff2b7306 *man/wsjibm.Rd
 1f618c4e5e9d225691a2faf4ef971ef1 *src/Makevars
 27229ba88ab87e30df3172d66e0b1c9f *src/latools.c
 7740fa94dae18c033519cb1fb83d9ea7 *src/latools.h
-fce31f3d1a928c3a28bbe207d3bc133b *src/mnlogit.c
+23750100a5bb897b3f046a268c4e763e *src/mnlogit.c
 1ca1fd84114ac95e5aa1253fdf15be15 *src/polysolve.c
 f52d7a60f3b0d7e626285d4e2b0a6a11 *src/polysolve.h
 6c098ccbf673338888b3b8280a587608 *src/rhelp.c

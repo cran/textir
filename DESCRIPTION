@@ -1,7 +1,7 @@
 Package: textir
 Title: Inverse Regression for Text Analysis
-Version: 1.8-6
-Date: 2012-06-11
+Version: 1.8-7
+Date: August 2012
 Author: Matt Taddy <taddy@chicagobooth.edu>
 Depends: R (>= 2.10), slam
 Suggests: MASS
@@ -17,6 +17,6 @@ References: Taddy (2012) "Multinomial Inverse Regression for Text
         Analysis" (http://arxiv.org/abs/1012.2098) and "On Estimation
         and Selection for Topic Models" (AISTATS 2012,
         http://arxiv.org/abs/1109.4518).
-Packaged: 2012-06-11 21:06:47 UTC; mtaddy
+Packaged: 2012-08-02 23:02:57 UTC; mtaddy
 Repository: CRAN
-Date/Publication: 2012-06-12 06:37:02
+Date/Publication: 2012-08-03 05:14:09

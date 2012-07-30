@@ -306,7 +306,7 @@ tpxQN <- function(move, Y, X, alpha, verb, admix, grp, doqn)
   V <- as.matrix(Y[,3]-Y[,2])
   sVU <- sum(V*U)
   Ymove <- V*(sVU/(sum(U^2)-sVU)) 
-  qnup <- tpxFromNEF(Y[,3] + Ymove,n=nrow(move$omega),
+  qnup <- tpxFromNEF(Y[,3] + Ymove, n=nrow(move$omega),
                      p=nrow(move$theta), K=ncol(move$theta))
 
   ## check for a likelihood improvement

@@ -87,6 +87,7 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
             G = as.double(G),
             RE = as.integer(checked$RE),
             revec = as.double(revec),
+            qn = as.integer(checked$QN),
             verb = as.integer(verb),
             PACKAGE="textir")
   
@@ -109,8 +110,8 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
   if(bins==0){ X=NULL; V=NULL; }
 
   ## calculate the estimated penalties 
-  rateincrease = 2.0^map$lampar[1]
-  if(rateincrease > 1){ cat(sprintf("WARNING: Prior parameters were multiplied by %g in order to get convergence.\n", rateincrease)) }
+  rateincrease = 2^map$lampar[1]
+  if(rateincrease > 1){ cat(sprintf("WARNING: Hyperprior parameters were multiplied by %g to ensure global convergence.\n", rateincrease)) }
 
   ## deal with never observed categories
   if(any(never)){
@@ -377,7 +378,7 @@ cubic <- function(a, b, c, quiet=FALSE, plot=FALSE)
 #######  Undocumented "mnlm"-related utility functions #########
 
 ## check the inputs and bin
-mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmin=0.01, randeffects=FALSE){
+mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmin=0.01, randeffects=FALSE, quasinewton=TRUE){
 
   ## check counts (can be an object from tm, slam, or a simple co-occurance matrix or a factor)
   if(is.null(dim(counts))){ 
@@ -386,6 +387,7 @@ mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmi
                                     dimnames=list(NULL, response=levels(counts))) }
   if(inherits(counts, "TermDocumentMatrix")){ counts <- t(counts) }
   counts <- as.simple_triplet_matrix(counts)
+  if(is.null(dimnames(counts)[[2]])){ dimnames(counts)[[2]] <- paste("cat",1:ncol(counts),sep="") }
 
   ## deal with never observed categories
   fullnames <- dimnames(counts)[[2]]
@@ -437,13 +439,8 @@ mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmi
   
     F <- apply(matrix(out$O, nrow=nrow(V), ncol=ncol(V)), 2, as.factor)
     I <- interaction(as.data.frame(F), drop=TRUE)
-
     Vm <- apply(V, 2, function(v) tapply(v, I, mean) )
-
-    xij <- interaction(as.numeric(I)[X$i], X$j, drop=TRUE)
-    vals <- tapply(X$v, xij, sum) 
-    ij <- matrix(as.numeric(unlist(strsplit(names(vals), split="\\."))), ncol=2, byrow=TRUE)
-    Xs <- simple_triplet_matrix(i=ij[,1], j=ij[,2], v=vals, dimnames=list(I=dimnames(Vm)[[1]], cat=dimnames(X)[[2]]))
+    Xs <- rollup(X,1,I)
 
     if(verb){
       cat("\nResponse Bins: \n")
@@ -477,7 +474,7 @@ mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmi
   if(!normalize) covarSD <- NULL
 
   return( list(counts=counts, covars=covars, covarMean=covarMean, covarSD=covarSD, fullnames=fullnames, never=never,
-               prior=prior, X=X, V=V, I=I, N=N, delta=delta, dmin=dmin, RE=randeffects) )
+               prior=prior, X=X, V=V, I=I, N=N, delta=delta, dmin=dmin, RE=randeffects, QN=quasinewton) )
 
 }
 

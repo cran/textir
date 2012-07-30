@@ -14,6 +14,7 @@
 int n, p, d, Nx, Nv, RE;
 
 int dirty = 0;
+int qn = 0;
 double *m = NULL;
 double *X = NULL;
 int **xind = NULL;
@@ -33,10 +34,13 @@ double *revar = NULL;
 double *remean = NULL;
 double **U = NULL;
 double *nvec;
+double **B0 = NULL;
+double *S0 = NULL;
+double *S1 = NULL;
 
 /* un-normalized negative log posterior */
 
-double neglogpost(){  
+double neglogpost(double **beta){  
   
   double L = 0.0;
   int i, j, k;
@@ -45,11 +49,11 @@ double neglogpost(){
 
   for(k=0; k<d; k++){ 
     if(maplam[k]==0) 
-      for(j=0;j<p;j++) L += lam[k][0]*fabs(B[k][j]);
+      for(j=0;j<p;j++) L += lam[k][0]*fabs(beta[k][j]);
     else if(maplam[k]==1) 
-      for(j=0;j<p;j++) L += lam[k][0]*log( 1.0 + fabs(B[k][j])/lam[k][1] );
+      for(j=0;j<p;j++) L += lam[k][0]*log( 1.0 + fabs(beta[k][j])/lam[k][1] );
     else if(maplam[k]==2)
-      for(j=0;j<p;j++) L += B[k][j]*B[k][j]*0.5*lam[k][1];
+      for(j=0;j<p;j++) L += beta[k][j]*beta[k][j]*0.5*lam[k][1];
   }
   if(RE) for(i=0;i<n;i++) for(j=0;j<p;j++) if(p>2 | j == 1) L += (U[j][i]-remean[i])*(U[j][i]-remean[i])*0.5/revar[i];
 
@@ -59,15 +63,15 @@ double neglogpost(){
 
 /* update eta + B, and return the new objective value */
 
-void update(int j, int k, double bnew)
+void update(int j, int k, double bchange)
 {
   int i;
   copy_dvec(nvec, eta[j], n);
-  for(i=vk[k]; i<vk[k+1]; i++) nvec[vind[0][i]] += V[i]*(bnew-B[k][j]);
+  for(i=vk[k]; i<vk[k+1]; i++) nvec[vind[0][i]] += V[i]*(bchange);
   for(i=0; i<n; i++)
     { denom[i] += exp(nvec[i]) - exp(eta[j][i]);
       eta[j][i] = nvec[i]; }
-  B[k][j] = bnew;
+  B[k][j] = B[k][j] + bchange;
 }
 
 /* lub factor */
@@ -218,6 +222,9 @@ void mnlm_cleanup(){
   if(remean){ free(remean); remean = NULL; }
   if(revar){ free(revar); revar = NULL; }
   if(U){ delete_mat(U); U = NULL; }
+  if(B0){ delete_mat(B0); B0 = NULL; }
+  if(S0){ free(S0); S0 = NULL; }
+  if(S1){ free(S1); S1 = NULL; }
 }
 
 /* 
@@ -236,14 +243,14 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
 	      int *maplam_in, double *lam_in, 
 	      double *dmin, double *dinit, 
 	      double *Gout, int *RE_in, double *randeff,
-	      int *verbalize)
+	      int *accelerate, int *verbalize)
 {
   dirty = 1; // flag to say the function has been called
   time_t itime = time(NULL);  // time stamp for periodic R interaction 
 
   int i, j, k, t, verb;
   double tol, grad, diff;
-  double Lold, Lnew;
+  double Lold, Lnew, Lqn;
 
   /** Build everything **/
   verb = *verbalize;
@@ -291,7 +298,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
 
   G = new_mat_fromv(p, d, Gout);
 
-  Lnew = neglogpost();
+  Lnew = neglogpost(B);
   if(isinf(Lnew) || isnan(Lnew)){  
     warning(" Infinite or NaN initial fit; starting at zero instead.  \n  Try `normalize=TRUE' or a larger penalty shape or rate.\n");
     for(j=0; j<p; j++) for(k=0; k<d; k++) B[k][j] = 0.0;
@@ -302,21 +309,25 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
     else{
       zero_mat(eta, n, p);
       for(i=0; i<n; i++) denom[i] = ((double) p); }
-    Lnew  = neglogpost(); 
+    Lnew  = neglogpost(B); 
     if(isinf(Lnew) || isnan(Lnew)){
       warning(" Probabilities of exactly zero in your likelihood.  \n   You need to use a larger penalty.\n");
       Lnew = 100000000.0; 
     }
   }
     
+  qn = *accelerate;
+  if(qn) // quasi newton acceleration
+    { B0 = new_mat(p,d);
+      S0 = new_dvec(p*d);
+      S1 = new_dvec(p*d); }
 
   diff = tol*100.0;
   t = 0;
   int dozero = 1; 
   double numzero, nregpar;
-  double bnew;
+  double bchange;
   double rateincrease = 0.0; 
-
 
   /* introductory print statements */
   if(verb)
@@ -324,26 +335,34 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
       myprintf(mystdout, "Objective L initialized at %g\n", Lnew); }
   
   /* optimize until objective stops improving */
+  void *tmp;
   while(diff > tol | diff < 0){
     numzero = 0.0;
     nregpar = 0.0;
+    
+    if(qn)
+      {	tmp = S0;
+	S0 = S1;
+	S1 = tmp; 
+	if((t+1)>=12 && (t+1)%3 == 0) copy_mat(p, d, B0, B); }
 
     // loop through coefficient
     for(j=0; j<p; j++)
       for(k=0; k<d; k++)
 	if(maplam[k]>=0 & (p>2 | j == 1)){ 
-	  if(B[k][j] != 0.0 || dozero || lam[k][0]==0 || t < 3 || runif(0,1) < 0.1){
+	  if(B[k][j] != 0.0 || dozero || lam[k][0]==0 || t < 3 || (t+k*p+j)%10 == 0 ){
 	    // gradient
 	    grad = G[k][j];
 	    for(i=vk[k]; i<vk[k+1]; i++) grad += m[vind[0][i]]*exp(eta[j][vind[0][i]] - log(denom[vind[0][i]]))*V[i]; 
 	    // curvature 
 	    calcH(j, k); 
 	    // conditional newton update
-	    bnew = B[k][j] + Bmove(j, k, grad, sign(B[k][j]));
+	    bchange = Bmove(j, k, grad, sign(B[k][j]));
+	    if(qn) S1[k*p + j] = bchange;
 	    // check and update dependencies
-	    if(bnew != B[k][j])
-	      { D[k][j] = fmax(*dmin,fmax(0.5*D[k][j], 2.0*fabs(B[k][j] - bnew)));
-		update(j, k,  bnew); 
+	    if(bchange != 0.0)
+	      { D[k][j] = fmax(*dmin,fmax(0.5*D[k][j], 2.0*fabs(bchange)));
+		update(j, k,  bchange); 
 		if(D[k][j] <= 0.0) error("negative bound window in mnlogit. Please report this bug."); }
 	  }
 	  // sum the zeros and check for escape from R
@@ -360,9 +379,29 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
     // iterate
     t++;
     Lold = Lnew;
-    Lnew = neglogpost();
+    Lnew = neglogpost(B);
+
+    // accelerate
+    if(qn)
+      if(t>=12 && t%3 == 0){ 
+	for(i=0; i<p*d; i++) 
+	for(j=0; j<p; j++) for(k=0; k<d; k++) 
+			     { i = k*p+j;
+			       if(B[k][j] != 0 && B0[k][j] != 0 && S0[k*p+j] != 0 && S1[k*p+j] != S0[k*p+j])
+				 { S0[i] = S0[i]*S0[i]/( S0[i]*(S0[i]-S1[i]) );
+				   B0[k][j] = (1.0 - S0[i])*B0[k][j] + S0[i]*B[k][j]; } }
+	Lqn = neglogpost(B0);
+	if(Lqn < Lnew)
+	  { if(verb) myprintf(mystdout, "QN jump: %g\n", Lnew-Lqn);
+	    Lnew = Lqn;
+	    tmp = B;
+	    B = B0;
+	    B0 = tmp; }
+      }
+
+    // diff  
     diff = Lold - Lnew;
-    
+
     // print 
     if(Lnew!=Lnew || !isfinite(Lnew) || Lnew < 0){ 
       warning("The algorithm did not converge (non-finite likelihood).  \n   Try `normalize=TRUE' or a larger penalty shape or rate.\n"); 
@@ -381,9 +420,9 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
 	    lam[k][1] *= 2.0; 
 	    i++; }
       if(i>0 && rateincrease < 8){
-	if(verb) myprintf(mystdout, "WARNING: non-monotonic convergence, probably due to a non-concave posterior.  \n");
+	if(verb) myprintf(mystdout, "WARNING: non-monotonic convergence, indicating objective multi-modality.  \n");
 	rateincrease += 1.0;
-	Lnew = neglogpost();}
+	Lnew = neglogpost(B);}
       else{
 	 warning("The algorithm did not converge (non-decreasing likelihood).  \n  Try `normalize=TRUE' or a larger penalty shape or rate.\n");
 	 dozero = 1;
@@ -398,6 +437,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
       { diff += tol+1.0; 
 	dozero = 1; } 
   }
+  tmp = NULL;
   
   /* clean, collect, and exit */
   for(j=0; j<p; j++) for(k=0; k<d; k++) beta_vec[k*p + j] = B[k][j];  // beta fit

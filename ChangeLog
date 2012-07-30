@@ -1,10 +1,16 @@
+1.8-7 (Aug 2012)
+---
+added QN acceleration option to mnlm
+made active set updates deterministic
+use slam's new rollup in mncheck
+
 1.8-6 (Jun 11 2012)
 ---
 updated LUB calculation
 added print.mnlm to namespace
 add ROC plot option for mnlm
 have normalize check for s=0
-fix load=0 for covar or counts with sd=0 
+fix load=0 for covar or counts with sd=0
 add coef S3 method from mnlm
 return mnlm loadings as stm
 remove lambda from mnlm return
