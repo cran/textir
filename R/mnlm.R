@@ -2,13 +2,14 @@
 
 ## Main function; most happens in .C 
 mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), start=NULL,
-                 tol=1e-2, bins=0, verb=FALSE, ...)
+                 tol=1e-2, bins=0, verb=FALSE, quasinewton=0, ...)
 {
   
   on.exit(.C("mnlm_cleanup", PACKAGE = "textir"))
   
   ## check and possibly bin observations for fast inference
-  checked <- mncheck(counts=counts, covars=covars, normalize=normalize, bins=bins, penalty=penalty, verb=verb, ...)
+  checked <- mncheck(counts=counts, covars=covars, normalize=normalize,
+                     bins=bins, penalty=penalty, verb=verb, quasinewton=quasinewton, ...)
   X <- checked$X # stm; adds a null column onto X if ncol(X) > 2
   V <- checked$V # stm; adds an intercept onto the covariates
 
@@ -87,7 +88,7 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
             G = as.double(G),
             RE = as.integer(checked$RE),
             revec = as.double(revec),
-            qn = as.integer(checked$QN),
+            qn = as.double(checked$QN),
             verb = as.integer(verb),
             PACKAGE="textir")
   
@@ -104,6 +105,7 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
     xhat <- simple_triplet_matrix(i=X$i, j=X$j, v=map$fitted*m[X$i], dimnames=dimnames(X))
     intercept <- matrix(coef[,1], ncol=1, dimnames=list(category=dimnames(counts)[[2]],"intercept"))
     loadings <- matrix(coef[,-1], nrow=p, dimnames=list(category=dimnames(counts)[[2]], covariate=dimnames(covars)[[2]])) }
+
   loadings <- as.simple_triplet_matrix(loadings)
 
   ## clean un-needed summaries
@@ -115,9 +117,13 @@ mnlm <- function(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), st
 
   ## deal with never observed categories
   if(any(never)){
-    loadings <- simple_triplet_matrix(i=match(dimnames(loadings)[[1]][loadings$i],fullnames),
-                                      j=loadings$j, v = loadings$v, nrow=length(fullnames),
-                                      dimnames=list(category=fullnames, covariate=dimnames(loadings)[[2]]))
+    if(length(loadings$i) != 0){
+      loadings <- simple_triplet_matrix(i=match(dimnames(loadings)[[1]][loadings$i],fullnames),
+                                        j=loadings$j, v = loadings$v, nrow=length(fullnames),
+                                        dimnames=list(category=fullnames, covariate=dimnames(loadings)[[2]])) }
+    else{ loadings <- as.simple_triplet_matrix(matrix(rep(0, length(fullnames)*ncol(loadings)),
+                                                      ncol=ncol(loadings),
+                                                      dimnames=list(category=fullnames, covariate=dimnames(loadings)[[2]]))) }
     fullalpha <- rep(log(1/(10+sum(counts))),length(fullnames))
     fullalpha[!never] <- intercept
     intercept <- matrix(fullalpha, ncol=1, dimnames=list(category=fullnames,"intercept"))
@@ -378,7 +384,7 @@ cubic <- function(a, b, c, quiet=FALSE, plot=FALSE)
 #######  Undocumented "mnlm"-related utility functions #########
 
 ## check the inputs and bin
-mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmin=0.01, randeffects=FALSE, quasinewton=TRUE){
+mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmin=0.01, randeffects=FALSE, quasinewton=0){
 
   ## check counts (can be an object from tm, slam, or a simple co-occurance matrix or a factor)
   if(is.null(dim(counts))){ 
@@ -472,6 +478,8 @@ mncheck <- function(counts, covars, normalize, bins, penalty, verb, delta=1, dmi
   ## build prior
   prior <- buildprior(penalty, ncol(V), ncol(X), verb=verb, fix=c(FALSE, covarSD==0))
   if(!normalize) covarSD <- NULL
+
+  if(quasinewton < 0) quasinewton <- 0
 
   return( list(counts=counts, covars=covars, covarMean=covarMean, covarSD=covarSD, fullnames=fullnames, never=never,
                prior=prior, X=X, V=V, I=I, N=N, delta=delta, dmin=dmin, RE=randeffects, QN=quasinewton) )

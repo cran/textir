@@ -35,7 +35,7 @@ corr <- function(x, y){
   
 ## column standard deviation for a simple_triplet_matrix 
 sdev <- function(x){
-  if(!inherits(x, "simple_triplet_matrix")){ return(apply(x,2,sd)) }
+  if(!inherits(x, "simple_triplet_matrix")){ return(apply(as.matrix(x),2,sd)) }
   n <- nrow(x)
   sqrt(col_sums(x^2)/(n-1) - col_sums(x)^2/(n^2 - n))
   return( sqrt(col_sums(x^2)/(n-1) - col_sums(x)^2/(n^2 - n)) ) }

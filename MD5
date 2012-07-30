@@ -1,9 +1,9 @@
-29e0f3da9c375c5ad8e218c5bda41f04 *ChangeLog
-884e73fe8d94e9f14e8af530a8ad22a0 *DESCRIPTION
+9c532dc7d02809960211edf069c61805 *ChangeLog
+7507e8eb3287d76db903d17c5e928c4e *DESCRIPTION
 276c717e610b11e9d9601597c4cd0cae *LICENSE
 dbe906e0f88586401163942a3d4b44c9 *NAMESPACE
-3046c838eb6fd043339b756b8c84c73c *R/count.R
-a1b9037f6c27384c42013626c2fa63b0 *R/mnlm.R
+76f4f2c7610c027ba251ea046feecb95 *R/count.R
+a97007570d257fd7080eddb65c5718ac *R/mnlm.R
 83fb2eef29fbeecc7f284c4fbe62a084 *R/pls.R
 87462f9682f2a35eb197d94acf645186 *R/topics.R
 b37bea6ee984c3a3b3829eac671d7324 *R/tpx.R
@@ -15,7 +15,7 @@ ceb90a055d538cc564c11b24e6edb0a4 *man/coef.mnlm.Rd
 629e3cb638d9d1179d1fc3be869f2c86 *man/congress109.Rd
 b6a647a64ba3a65ef0f29ebae6b594f4 *man/corr.Rd
 91b13cc23c5bfabbba6a3bb7a722c188 *man/freq.Rd
-1298fbaff0b1d6f69465e0a5862f381e *man/mnlm.Rd
+30836f11c262b77a3460b1ee9d1612d7 *man/mnlm.Rd
 db20cf1e610c8855b0939e84a3c5c96a *man/normalize.Rd
 75db18de3d3c2dc743f7d96872981f6d *man/plot.mnlm.Rd
 aad0593e7b94dfda11402a1d21a3d09f *man/plot.pls.Rd
@@ -39,7 +39,7 @@ bc980b050d6d7fc06b7db0d5ff2b7306 *man/wsjibm.Rd
 1f618c4e5e9d225691a2faf4ef971ef1 *src/Makevars
 27229ba88ab87e30df3172d66e0b1c9f *src/latools.c
 7740fa94dae18c033519cb1fb83d9ea7 *src/latools.h
-23750100a5bb897b3f046a268c4e763e *src/mnlogit.c
+5b42b4061e86ebe4a7737ad46717ef47 *src/mnlogit.c
 1ca1fd84114ac95e5aa1253fdf15be15 *src/polysolve.c
 f52d7a60f3b0d7e626285d4e2b0a6a11 *src/polysolve.h
 6c098ccbf673338888b3b8280a587608 *src/rhelp.c

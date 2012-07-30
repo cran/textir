@@ -14,7 +14,6 @@
 int n, p, d, Nx, Nv, RE;
 
 int dirty = 0;
-int qn = 0;
 double *m = NULL;
 double *X = NULL;
 int **xind = NULL;
@@ -243,14 +242,14 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
 	      int *maplam_in, double *lam_in, 
 	      double *dmin, double *dinit, 
 	      double *Gout, int *RE_in, double *randeff,
-	      int *accelerate, int *verbalize)
+	      double *quasinewton, int *verbalize)
 {
   dirty = 1; // flag to say the function has been called
   time_t itime = time(NULL);  // time stamp for periodic R interaction 
 
   int i, j, k, t, verb;
   double tol, grad, diff;
-  double Lold, Lnew, Lqn;
+  double qn, Lold, Lnew, Lqn;
 
   /** Build everything **/
   verb = *verbalize;
@@ -316,8 +315,8 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
     }
   }
     
-  qn = *accelerate;
-  if(qn) // quasi newton acceleration
+  qn = *quasinewton;
+  if(qn>0.0) // quasi newton acceleration
     { B0 = new_mat(p,d);
       S0 = new_dvec(p*d);
       S1 = new_dvec(p*d); }
@@ -340,11 +339,11 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
     numzero = 0.0;
     nregpar = 0.0;
     
-    if(qn)
+    if(qn>0.0)
       {	tmp = S0;
 	S0 = S1;
 	S1 = tmp; 
-	if((t+1)>=12 && (t+1)%3 == 0) copy_mat(p, d, B0, B); }
+	if(fabs(diff) < qn*tol && (t+1)%3 == 0) copy_mat(p, d, B0, B); }
 
     // loop through coefficient
     for(j=0; j<p; j++)
@@ -358,7 +357,7 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
 	    calcH(j, k); 
 	    // conditional newton update
 	    bchange = Bmove(j, k, grad, sign(B[k][j]));
-	    if(qn) S1[k*p + j] = bchange;
+	    if(qn>0.0) S1[k*p + j] = bchange;
 	    // check and update dependencies
 	    if(bchange != 0.0)
 	      { D[k][j] = fmax(*dmin,fmax(0.5*D[k][j], 2.0*fabs(bchange)));
@@ -382,8 +381,8 @@ void Rmnlogit(int *n_in, int *p_in, int *d_in, double *m_in, double *tol_in,
     Lnew = neglogpost(B);
 
     // accelerate
-    if(qn)
-      if(t>=12 && t%3 == 0){ 
+    if(qn>0)
+      if(fabs(diff) < qn*tol && t%3 == 0){ 
 	for(i=0; i<p*d; i++) 
 	for(j=0; j<p; j++) for(k=0; k<d; k++) 
 			     { i = k*p+j;

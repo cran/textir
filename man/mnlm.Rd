@@ -8,7 +8,7 @@ MAP estimation of multinomial logistic regression models.
   }
 \usage{
 mnlm(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), 
-                     start=NULL, tol=1e-2, bins=0, verb=FALSE, ...)
+                     start=NULL, tol=1e-2, bins=0, verb=FALSE, quasinewton=0, ...)
 1}
 \arguments{
   \item{counts}{
@@ -65,6 +65,10 @@ mnlm(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2),
    Control for print-statement output.  \code{TRUE} prints some initial info 
    and updates every iteration.
 }
+\item{quasinewton}{
+   If greater than zero, we attempt quasi-Newton acceleration [see Lange, 2010] after the objective updates are less than
+   \code{quasinewton*tol}.  Be warned: this feature is new and experimental.  It can significantly speed convergence,
+    but also increases the chance of a non-global solution.}
 \item{...}{
    Additional undocumented arguments to internal functions.   }
 }
@@ -123,6 +127,8 @@ mnlm(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2),
 \references{
 Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
 \url{http://arxiv.org/abs/1012.2098}
+
+Lange (2010), \emph{Numerical Analysis for Statisticians}.
 }
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}
