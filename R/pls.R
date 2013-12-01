@@ -1,47 +1,90 @@
-## minimalist partial least squares
-pls <- function(X, y, K=1, scale=TRUE, verb=TRUE){
+## Tools for manipulation of text count matrices ##
+stm2dg <- function(x, ...){
+  sparseMatrix(i=x$i, j=x$j, x=x$v,
+        dims=dim(x),dimnames=dimnames(x), ...) }
 
+## correlation 
+corr <- function(x, y){
+  if(inherits(x, "simple_triplet_matrix")) x <- stm2dg(x)
+  if(!inherits(x, "dgCMatrix")){ return(cor(x,y) ) }
+
+  n <- nrow(x)
+  v <- t(scale(y))
+  
+  r <- tcrossprod(t(x)/sdev(x), v)/(n-1)
+  dimnames(r) <- list(dimnames(x)[[2]], dimnames(y)[[2]])
+  return( r ) 
+}
+  
+## column standard deviation 
+sdev <- function(x){
+  if(is.null(dim(x))) return(sd(x))
+  if(inherits(x, "simple_triplet_matrix")) x <- stm2dg(x)
+  if(!inherits(x, "dgCMatrix")){ return(apply(as.matrix(x),2,sd)) }
+  n <- nrow(x)
+  s <- sqrt(colSums(x^2)/(n-1) - colSums(x)^2/(n^2 - n)) 
+  names(s) <- colnames(s)
+  return(s)  }
+
+## minimalist partial least squares
+pls <- function(x, y, K=1, scale=TRUE, verb=TRUE){
+
+  if(inherits(x,"simple_triplet_matrix")) x <- stm2dg(x)
+  xorig <- x
   if(scale){
-    sdf = sdev(X)
-    if(!inherits(X, "simple_triplet_matrix"))
-      { X <- t(t(X)/sdf) } else{ X$v <-  X$v/sdf[X$j] }
-    scale = sdf
+    scale = sdev(x)
+    x <- t(t(x)/scale) 
   }
   else{ scale = NULL }
  
-  phi <- matrix(ncol=K, nrow=ncol(X))
-  z <- matrix(ncol=K, nrow=nrow(X))
+  phi <- matrix(ncol=K, nrow=ncol(x))
+  shift <- rep(0,K)
+  z <- matrix(ncol=K, nrow=nrow(x))
   yhat <- NULL
 
   if(ncol(as.matrix(y)) > 1){stop( "PLS only works for univariate y (vector or single column matrix).")}
-  v <- normalize(as.numeric(y))
+  v <- scale(as.numeric(y))
   
   if(verb){ cat("Directions ") }
   for(k in 1:K){
     if(verb){ cat(paste(k,", ",sep="")) }
 
     ## inverse regression, equiv: t(lm(X~v[,k])$coef)[,2]
-    phi[,k] <- corr(X,v[,k])
+    phi[,k] <- as.matrix(corr(x,v[,k]))
     
     ## project the fitted direction
-    if(inherits(X, "simple_triplet_matrix")){
-      z[,k] <- tcrossprod_simple_triplet_matrix(X, t(phi[,k]))
-    } else { z[,k] <- X%*%phi[,k] }
+    if(inherits(x, "dgCMatrix")){
+      z[,k] <- as.matrix(tcrossprod(x, t(phi[,k])))
+    } else { z[,k] <- x%*%phi[,k] }
 
-    ## orthogonalize
+    ## ortho-normalize
     if(k<K){ v <- cbind(v, lm(v[,k] ~ z[,k])$resid) }
+    if(k==1) zlm <- lm(z[,1] ~ 1)
+    else zlm <- lm(z[,k] ~ z[,(1:(k-1))])
+    s <- sdev(zlm$resid)
+    if(s==0) stop( sprintf("perfect fit in pls at k = %d", k) )
+    z[,k] <- resid(zlm)/s
+    shift[k] <- coef(zlm)[1]/s
+    if(k==1) phi[,1] <- phi[,1]/s
+    else{
+      phi[,k] <- (phi[,k] - phi[,(1:(k-1)),drop=FALSE]%*%coef(zlm)[-1])/s
+      shift[k] <- shift[k] - sum(coef(zlm)[-1]*shift[1:(k-1)])/s }
+
+    ## fitted values
     yhat <- cbind(yhat, lm(as.numeric(y)~z[,1:k])$fitted)
   }  
   if(verb){ cat("done.\n")}
   
   fwdmod = lm(as.numeric(y)~z)
+  if(!is.null(scale)){ phi <- phi/scale }
 
-  dimnames(z) <- list(dimnames(X)[[1]], direction=paste("z",1:ncol(z),sep=""))
-  dimnames(yhat) <- list(dimnames(X)[[1]], model=paste("pls",1:ncol(z),sep=""))
-  dimnames(phi) <- list(dimnames(X)[[2]], factor=paste("v",1:ncol(z) -1 ,sep=""))
-  dimnames(v) <- list(dimnames(X)[[1]], factor=paste("v",1:ncol(z) -1 ,sep=""))
+  dimnames(z) <- list(rownames(z), direction=paste("z",1:ncol(z),sep=""))
+  dimnames(yhat) <- list(rownames(x), model=paste("pls",1:ncol(z),sep=""))
+  dimnames(phi) <- list(colnames(x), factor=paste("v",1:ncol(z) -1 ,sep=""))
+  names(shift) <- paste("z",1:ncol(z),sep="")
   
-  out <- list(y=y, X=X, directions=z, loadings=phi, factors=v, fitted = yhat, fwdmod = fwdmod, scale=scale)
+  out <- list(y=y, x=xorig, directions=z, loadings=phi, shift=shift,
+              fitted = yhat, fwdmod = fwdmod)
   class(out) <- "pls"
   return(out) }
 
@@ -71,19 +114,20 @@ summary.pls <- function(object, ...){
 
 ## S3 method summary function
 print.pls <- function(x, ...){
-  cat(paste("\nA pls(", ncol(x$directions), ") object, reduced from ", ncol(x$X), " input variables. \n\n", sep="")) }
+  cat(paste("\nA pls(", ncol(x$directions), ") object, reduced from ", ncol(x$x), " input variables. \n\n", sep="")) }
 
  ## S3 method predict function
 predict.pls <- function(object, newdata, type="response", ...)
 {
-  if(is.vector(newdata)){ newdata <- matrix(newdata, nrow=1) }
-  if(!is.null(object$scale)){
-    if(!inherits(newdata, "simple_triplet_matrix"))
-      { newdata <- t(t(newdata)/object$scale) } else{ newdata$v <-  newdata$v/object$scale[newdata$j] }
-  }
-  if(inherits(newdata, "simple_triplet_matrix")){
-    z <- tcrossprod_simple_triplet_matrix(newdata, t(object$loadings))
-    } else { z <- newdata%*%object$loadings }
+  if(is.vector(newdata))
+    newdata <- matrix(newdata, nrow=1) 
+  if(inherits(newdata, "simple_triplet_matrix")) 
+    newdata <- stm2dg(newdata)
+  if(inherits(newdata,"dgCmatrix"))
+    z <- tcrossprod(newdata, t(object$loadings))
+  else z <- as.matrix(newdata)%*%object$loadings
+  
+  z <- t(t(z) - object$shift)
   if(type=="response"){
     fitted <- cbind(1,z)%*%object$fwdmod$coef
     return(fitted)

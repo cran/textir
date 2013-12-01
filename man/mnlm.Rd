@@ -1,174 +1,88 @@
 \name{mnlm}
 \alias{mnlm}
+\alias{srproj}
 \title{
-Estimation for high-dimensional Multinomial Logistic Regression
-}
+Multinomial Inverse Regression (MNIR)}
 \description{
-MAP estimation of multinomial logistic regression models.  
+Estimation of high dimensional multinomial logistic regression models and the corresponding MNIR sufficient reduction projections.   
   }
 \usage{
-mnlm(counts, covars, normalize=TRUE, penalty=c(shape=1,rate=1/2), 
-                     start=NULL, tol=1e-2, bins=0, verb=FALSE, quasinewton=0, ...)
-1}
+mnlm(cl, covars, counts, mu=NULL, bins=NULL, verb=0, ...)
+srproj(obj, counts, dir=1:K, ...)
+}
 \arguments{
-  \item{counts}{
-    A matrix of multinomial response counts in \code{ncol(counts)} or \code{nlevel(counts)} categories 
-    for \code{nrow(counts)} observations.  This can be a \code{matrix}, a vector of response factors, 
-   or a \code{simple_triplet_matrix} (as defined in the \code{slam} package).  
-   Refer to the details for a model identification note.
-}
-  \item{covars}{
-    A \code{matrix} or \code{simple_triplet_matrix} of \code{ncol(covars)} covariate values for each of the \code{nrow(counts)} observations.
-    This does not include the intercept, which is ALWAYS added in the design matrix.   
-}
- \item{normalize}{
-    Whether or not to normalize the covariates. Default is \code{TRUE}.  If \code{covars} is a \code{matrix}, 
-    this will scale the inputs to have mean zero and standard deviation of one.   If \code{covars} is a \code{simple_triplet_matrix}, 
-    we assume that you want to stay in sparse format; hence the inputs are scaled to have sd = 1 but left unshifted.
-}
-\item{penalty}{
-  This input argument is a vector of length 2 containing \eqn{[s, r]} 
-  -- shape "\eqn{s}" and rate "\eqn{r}" -- 
-  parameters for the Gamma prior on L1 (lasso) penalty \eqn{\lambda},
-  such that \eqn{E\lambda = s/r}.   Refer to the details section for additional 
-  information on this gamma-lasso specification. 
-  The default is appropriate for normalized covariates. 
-
-  Additionally, you can specify a normal (ridge) prior with variance
-  1/\code{rate} by setting the shape to zero (i.e. with
-  \code{penalty=c(0,rate)}), set \code{penalty} to a single fixed
-  value of \eqn{\lambda>0}, or fix coefficients at \code{start} by
-  giving a penalty of -1.
-
-  Finally, \code{penalty} can also be defined as a list with  elements containing unique specification
-  for each column of the design matrix (including the intercept).   
- }
-\item{start}{
-    An optional initial guess for the full  \code{ncol(covars)+1} by \code{ncol(counts)} 
-    matrix of regression coefficients (including the intercept).   
-    Under the default \code{start=NULL},
-    the intercept is a logit transform of mean phrase frequencies and 
-    coefficients are the correlation between \code{covars} 
-    and  \code{freq(counts)}.
-}
-\item{tol}{
-  Optimization convergence tolerance for the improvement on the 
-  un-normalized negative log posterior over a single full parameter sweep.
-}
-\item{bins}{ For faster inference on large data sets 
-	     (or just to collapse observations across levels for factor covariates), 
-	     you can specify the number of \code{bins} for step-function 
-	     approximations to the columns of \code{covars}.  Counts are then collapsed 
-	     across levels of the interaction between columns of the resulting 
-	     discrete covariate matrix, typically resulting in a smaller number of observations for estimation.}
-\item{verb}{
-   Control for print-statement output.  \code{TRUE} prints some initial info 
-   and updates every iteration.
-}
-\item{quasinewton}{
-   If greater than zero, we attempt quasi-Newton acceleration [see Lange, 2010] after the objective updates are less than
-   \code{quasinewton*tol}.  Be warned: this feature is new and experimental.  It can significantly speed convergence,
-    but also increases the chance of a non-global solution.}
-\item{...}{
-   Additional undocumented arguments to internal functions.   }
+ \item{cl}{A \code{parallel} library socket cluster.  See the same argument in \code{help(dmr)} for details. }
+\item{covars}{A dense \code{matrix} 
+      or sparse \code{Matrix} of covariates.
+      This should not include the intercept.  See the same argument in \code{help(dmr)} for details.  }
+\item{counts}{A dense \code{matrix} 
+      or sparse \code{Matrix} of
+      response counts (e.g., token counts in text mining). 
+      See the same argument in \code{help(dmr)} for details. For \code{srproj},
+      this must have the same number of columns as the response dimensions (vocabulary size) in \code{obj}.}
+\item{mu}{
+  Pre-specified fixed effects for each observation in the Poisson regression linear equation.  See the same argument in \code{help(dmr)} for details.  }
+\item{bins}{Number of bins into which we will attempt to collapse each column of \code{covars}.  \code{bins=NULL}
+ does no collapsing. See the same argument in \code{help(dmr)} for details.}
+\item{verb}{Whether to print some info.  See the same argument in \code{help(dmr)} for details.}
+\item{obj}{Either a \code{dmr} object, as returned from \code{mnlm}, or the \code{dmrcoef} object obtained by calling \code{coef} on the output of \code{mnlm}.  The latter wwill be faster, since \code{coef.dmr} is called inside \code{srproj} otherwise.}
+\item{dir}{The attribute (\code{covar}) dimensions onto which you want to project.  
+The default is all dimensions: \code{1:K}, where \code{K} is the number of columns in the \code{covars} argument to mnlm.}
+\item{...}{Additional arguments to \code{gamlr} from \code{dmr} (via \code{mnlm}), and to \code{coef.dmr} from \code{srproj}.  See \code{help(gamlr)} and \code{help(dmr)} for details.}
 }
 \details{
- Finds the posterior mode for multinomial logistic regression
- parameters using cyclic coordinate descent.  This is designed to be
- useful for inverse regression analysis of sentiment in text, where
- the multinomial response is quite large, but should be 
- useful for any large-scale logistic regression.
+These functions provide the first two steps of multinomial inverse regression (see MNIR paper).
 
- For binomial response, the first category is assumed null.  For
- multinomial response, the model is identified by placing a Normal(0,1)
- prior on the intercepts (this can be changed via the list
- specification for \code{penalty}).
+ \code{mnlm} fits multinomial logistic regression
+ parameters under gamma lasso penalization on a factorized Poisson likelihood.  The \code{mnlm} function is just a simple wrapper of the \code{dmr} function of the \code{distrom} library (see DMR paper), which itself relies upon the \code{gamlr} library (see GL paper).  For model selection, coefficients, prediction, and plotting see the relevant functions in \code{help(dmr)}.
 
- Coefficient penalization is based upon the precision parameters
- \eqn{\lambda} of independent Laplace priors on each non-intercept
- regression coefficient.  Here, the Laplace density is \eqn{p(z) =
- (\lambda/2)exp[-\lambda|z|]}, with variance \eqn{2/\lambda}. Via the
- \code{penalty} argument, this precision is either fixed, which
- corresponds to the L1 penalty \eqn{\lambda|z|}, or it is assigned a
- \eqn{Gamma(s, r)} prior and estimated jointly with the coefficient,
- which corresponds to the `gamma-lasso' non-convex penalty \eqn{s*log[1 + |z|/r]}.
+ \code{srproj} calculates the MNIR  Sufficient Reduction projection from text \code{counts} on to the attribute dimensions of interest (\code{covars} in \code{mnlm}).  In particular, for counts \eqn{C}, with row sums \eqn{m}, and \code{mnlm} coefficients \eqn{\phi_j} corresponding to attribute \eqn{j},
+ \eqn{z_j = C'\phi_j/m} is the SR projection in the direction of \eqn{j}.  The MNIR paper explains how \eqn{V=[v_1 ... v_K]}, your original covariates/attributes, are independent of text counts \eqn{C} given SR projections \eqn{Z=[z_1 ... z_K]}.  
 
- In the case of gamma-lasso estimation, prior variance
- \eqn{s/r^2 = E\lambda/r} controls the degree of penalty curvature.
- In the case that the variance is large relative to the amount of
- information in the likelihood, the posterior can become multimodal.
- Since this leads to unstable optimization and less meaningful MAP
- estimates, \code{mnlm} will warn and automatically double \eqn{r} and
- \eqn{s} until obtaining a concave posterior.  If the resulting prior
- precision is higher than you would like, it may be worth the
- computational effort to integrate over penalty uncertainty in mean,
- rather than MAP, estimation; the \code{reglogit} package is available
- for such inference in binomial regression settings.
+  The final step of MNIR is `forward regression' for any element of \eqn{V} onto \eqn{Z} and the remaining elements of \eqn{V}.  We do not provide a function for this because you are free to use whatever you want; see the MNIR and DMR papers for linear, logistic, and random forest forward regression examples.
 
- Additional details are available in Taddy (2012).   }
+  Note that if you were previously using \code{textir} and \code{dmr} not for inverse regression, but rather just as fast code for multinomial logistic regression, you probably want to work directly with the \code{gamlr} (binary response) or \code{dmr} (multinomial response) packages.
+ }
 \value{
- An \code{mnlm} object list with entries
-\item{intercept}{The intercept estimates for each phrase (\eqn{\alpha}).}
-\item{loadings}{A \code{simple_triplet_matrix} of estimates for coefficients (\eqn{\Phi}) on the scale fitted (possibly normalized) covariates.}
-\item{counts}{\code{simple_triplet_matrix} form of the \code{counts} input matrix}
-\item{X}{If \code{bins>0}, the binned counts matrix used for analysis.}
-\item{covars}{The input covariates, possibly normalized.}
-\item{V}{If \code{bins>0}, the binned (and possibly normalized) covariate \code{simple_triplet_matrix} used for analysis.}
-\item{penalty}{The penalty specification upon convergence.}
-\item{normalized}{The input \code{normalize} indicator.}
-\item{binned}{An indicator for whether the observations was binned.}
-\item{covarMean}{If \code{normalize=TRUE}, the amount covariates were shifted (original means for matrix \code{covars}, 0 for sparse stm \code{covars}).  Otherwise empty.}
-\item{covarSD}{If \code{normalize=TRUE}, the original covariate standard deviations.  Otherwise empty.}
-\item{prior}{The penalty prior (gamma hyperparameters, or fixed laplace scale, or normal precision).}
-\item{fitted}{Fitted count expectations.  With binomial response, this is a vector of fitted probabilities. 
-	For multinomial response, it is a simple triplet matrix if of fitted probabilities 
-	ONLY for non-zero count observations (and with empty entries for zero count observations).}
-}
-\references{
-Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
-\url{http://arxiv.org/abs/1012.2098}
+ \code{mnlm} returns a \code{dmr} s3 object.  See \code{help(dmr)} for details.
 
-Lange (2010), \emph{Numerical Analysis for Statisticians}.
+ \code{srproj} returns a matrix with columns corresponding to directions \code{dir}, plus an additional column \code{m} holding the row totals of \code{counts}.
+ }
+\references{
+Taddy (2013), \emph{Multinomial Inverse Regression for Text Analysis} (MNIR).
+JASA 108.
+
+Taddy (2013), \emph{Distributed Multinomial Regression} (DMR).  arXiv:1311.6139.
+
+Taddy (2013), \emph{The Gamma Lasso} (GL).  arXiv:1308.5623.
 }
 \author{
   Matt Taddy \email{taddy@chicagobooth.edu}
 }
 \seealso{
-  congress109, we8there, plot.mnlm, summary.mnlm, predict.mnlm
+  congress109, we8there, dmr
 }
 \examples{
 
-### See congress109 and we8there for more real data examples
-
-### Bernoulli simulation; re-run to see sampling variability ###
-n <- 100
-v <- rnorm(n)
-p <- (1+exp(-(v*2)))^{-1} 
-y <- rbinom(n, size=1, prob=p)
-
-## fit the logistic model
-summary( fit <- mnlm(y, v, verb=TRUE) )
-par(mfrow=c(1,2))
-plot(fit)
-
-## use predict to see fitted probabilities (could also just use fit$fitted)
-phat <-  predict(fit, newdata=matrix(v,ncol=1))
-plot(p, phat, pch=21, bg=c(2,4)[y+1], xlab="true probability", ylab="fitted probability")
-
-### Ripley's Cushing Data ###
-
-## see help(Cushings) for data
+### Ripley's Cushing Data; see help(Cushings) ###
 library(MASS)
 data(Cushings)
-train <- Cushings[Cushings$Type != "u",]
+Cushings[,1:2] <- log(Cushings[,1:2])
+train <- Cushings[Cushings$Type!="u",]
 newdata <- as.matrix(Cushings[Cushings$Type == "u", 1:2])
 
-## fit, summarize, predict, and plot
-fit <- mnlm(counts=factor(train$Type), covars=train[,1:2])
-summary(fit)
-round(coef(fit),2)
-predict(fit, newdata)
-par(mfrow=c(1,1))
-plot(fit)
+## fit, coefficients, predict, and plot
+fit <- mnlm(NULL, 
+  covars=train[,1:2], 
+  counts=factor(train$Type))
 
- }
+## dmr applies AIC selection by default
+round(coef(fit),1) 
+round(predict(fit, newdata, type="response"),1)
+par(mfrow=c(1,3))
+for(j in c("a","b","c")){ 
+  plot(fit[[j]]); mtext(j,line=2) }
+
+## see we8there and congress109 for MNIR and srproj examples
+ 
+}

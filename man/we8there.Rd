@@ -8,21 +8,20 @@
 \description{
 Counts for 2804 bigrams in 6175 restaurant reviews from the site www.we8there.com. }
 
-\details{ The short user-submitted reviews are accompanied by a five-star rating on four specific aspects of restaurant quality - food, service, value, and atmosphere - as well as the overall experience.  The reviews originally appear in Maua and Cozman (2009), and the parsing details behind these specific counts are in Taddy (2011). }
+\details{ The short user-submitted reviews are accompanied by a five-star rating on four specific aspects of restaurant quality - food, service, value, and atmosphere - as well as the overall experience.  The reviews originally appear in Maua and Cozman (2009), and the parsing details behind these specific counts are in Taddy (MNIR; 2013). }
 
 \value{
-   \item{we8thereCounts}{ A \code{simple_triplet_matrix} of phrase counts indexed by review-rows and bigram-columns.}
+   \item{we8thereCounts}{ A \code{dgCMatrix} of phrase counts indexed by review-rows and bigram-columns.}
    \item{we8thereRatings}{ A \code{matrix} containing the associated review ratings. }
 }
 
 \references{ 
 Maua, D.D. and Cozman, F.G. (2009), \emph{Representing and classifying user reviews}. In ENIA '09: VIII Enconro Nacional de Inteligencia Artificial, Brazil.
 
-Taddy (2012), \emph{Multinomial Inverse Regression for Text Analysis}.
+Taddy (2013), \emph{Multinomial Inverse Regression for Text Analysis}.
 \url{http://arxiv.org/abs/1012.2098}
 
-Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
-\url{http://arxiv.org/abs/1109.4518}
+Taddy (2013), \emph{Distributed Multinomial Regression}.
 
 }
 
@@ -30,18 +29,51 @@ Taddy (2012), \emph{On Estimation and Selection for Topic Models}.
 Matt Taddy, \email{taddy@chicagobooth.edu}
 }
 
-\seealso{ pls, mnlm, congress109 }
+\seealso{ dmr, mnlm }
 
 \examples{
+## some multinomial inverse regression
+## we'll regress counts onto 5-star overall rating
 data(we8there)
 
-## use bins to estimate with counts collapsed across equal ratings 1...5
-summary( fitwe8 <- mnlm(we8thereCounts, we8thereRatings$Overall, bins=5) )
-plot(fitwe8, type="reduction", v=as.factor(we8thereRatings$Overall), col=c(2,2,2,3,3))
+## cl=NULL implies a serial run. 
+## To use a parallel library fork cluster, 
+## uncomment the relevant lines below. 
+## Forking is unix only; use PSOCK for windows
+cl <- NULL
+# cl <- makeCluster(detectCores(), type="FORK")
+## small nlambda for a fast example
+fits <- mnlm(cl, we8thereRatings[,'Overall',drop=FALSE], 
+			we8thereCounts, bins=5, gamma=1, nlambda=10)
+# stopCluster(cl)
 
-## Fit a topic model (use lower tol for true convergence)
-tpx <- topics(we8thereCounts, K=10, tol=100)
-plot(tpx, group=we8thereRatings$Overall>3, col=c(2,3), labels=c("Bad","Good"))
-summary(tpx)
+## plot fits for a few individual terms
+terms <- c("first date","chicken wing",
+			"ate here", "good food",
+			"food fabul","terribl servic")
+par(mfrow=c(3,2))
+for(j in terms)
+{ 	plot(fits[[j]]); mtext(j,font=2,line=2) }
+ 
+## extract coefficients
+B <- coef(fits)
+mean(B[2,]==0) # sparsity in loadings
+## some big loadings in IR
+B[2,order(B[2,])[1:10]]
+B[2,order(-B[2,])[1:10]]
+
+## do MNIR projection onto factors
+z <- srproj(B,we8thereCounts) 
+
+## fit a fwd model to the factors
+summary(fwd <- lm(we8thereRatings$Overall ~ z)) 
+
+## truncate the fwd predictions to our known range
+fwd$fitted[fwd$fitted<1] <- 1
+fwd$fitted[fwd$fitted>5] <- 5
+## plot the fitted rating by true rating
+par(mfrow=c(1,1))
+plot(fwd$fitted ~ factor(we8thereRatings$Overall), 
+	varwidth=TRUE, col="lightslategrey")
 
 }
